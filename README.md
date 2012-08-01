@@ -10,3 +10,4 @@ sudo pip install virtualenv
 # move to the home directory of py-refine-client
 virtualenv env --no-site-packages
 pip install -r requirements.txt
+
