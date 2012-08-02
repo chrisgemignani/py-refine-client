@@ -6,6 +6,7 @@ except ImportError: import json
 from os.path import basename
 from time import sleep
 from mimetools import choose_boundary
+from datetime import datetime
 
 
 
@@ -15,12 +16,12 @@ class RefineFormat(object):
     Docstring
     """
 
-    def __init__(self, id=None, name=None, label=None, download=None, uiClass=None, *args, **kwargs):
+    def __init__(self, id=None, name=None, label=None, download=None, ui_class=None, *args, **kwargs):
         self.id = kwargs.get('id', id)
         self.name = kwargs.get('name', name)
         self.label = kwargs.get('label', label)
         self.download = kwargs.get('download', download)
-        self.uiClass = kwargs.get('uiClass', uiClass)
+        self.uiClass = kwargs.get('uiClass', ui_class)
 
 
 class RefineConfiguration(object):
@@ -101,10 +102,10 @@ class DataSource(object):
     Docstring
     """
 
-    def __init__(self, declaredMimeType=None, location=None, fileName=None, origin=None, url=None, size=None, *args, **kwargs):
-        self.declaredMimeType=kwargs.get('declaredMimeType', declaredMimeType)
+    def __init__(self, declared_mime_type=None, location=None, file_name=None, origin=None, url=None, size=None, *args, **kwargs):
+        self.declared_mime_type=kwargs.get('declaredMimeType', declared_mime_type)
         self.location = kwargs.get('location', location)
-        self.fileName = kwargs.get('fileName', fileName)
+        self.fileName = kwargs.get('fileName', file_name)
         self.origin = kwargs.get('origin', origin)
         self.url = kwargs.get('url', url)
         self.size = kwargs.get('size', size)
@@ -115,25 +116,25 @@ class RetrievalRecord():
     Docstring
     """
 
-    def __init__(self, files=None, downloadCount=None, archiveCount=None, clipboardCount=None, uploadCount=None, *args, **kwargs):
+    def __init__(self, files=None, download_count=None, archive_count=None, clipboard_count=None, upload_count=None, *args, **kwargs):
         self.files = (DataSource(**f) for f in kwargs.get('files', files))
-        self.downloadCount = kwargs.get('downloadCount', downloadCount)
-        self.archiveCount = kwargs.get('archiveCount', archiveCount)
-        self.clipboardCount = kwargs.get('clipboardCount', clipboardCount)
-        self.uploadCount = kwargs.get('uploadCount', uploadCount)
+        self.download_count = kwargs.get('downloadCount', download_count)
+        self.archive_count = kwargs.get('archiveCount', archive_count)
+        self.clipboard_count = kwargs.get('clipboardCount', clipboard_count)
+        self.upload_count = kwargs.get('uploadCount', upload_count)
 
 
-class import_job_details():
+class ImportJobDetails():
 
-    def __init__(self, rankedFormats=None, hasData=None, state=None, fileSelection=None, retrievalRecord=None, *args, **kwargs):
-        self.rankedFormats = kwargs.get('rankedFormats', rankedFormats) # array of mime types in order of best guess for this data source
-        self.hasData = kwargs.get('hasData', hasData) # boolean
+    def __init__(self, ranked_formats=None, has_data=None, state=None, file_selection=None, retrieval_record=None, *args, **kwargs):
+        self.ranked_formats = kwargs.get('rankedFormats', ranked_formats) # array of mime types in order of best guess for this data source
+        self.has_data = kwargs.get('hasData', has_data) # boolean
         self.state = kwargs.get('state', state) # "ready"
-        self.fileSelection = kwargs.get('fileSelection', fileSelection) # [0]  ...what does that mean? is it an array of indices that correspond to values in retrievalRecord["files"]?
-        if retrievalRecord or "retrievalRecord" in kwargs:
-            self.retrievalRecord = RetrievalRecord(**kwargs.get('retrievalRecord', retrievalRecord)) # another object...
+        self.file_selection = kwargs.get('fileSelection', file_selection) # [0]  ...what does that mean? is it an array of indices that correspond to values in retrievalRecord["files"]?
+        if retrieval_record or "retrievalRecord" in kwargs:
+            self.retrieval_record = RetrievalRecord(**kwargs.get('retrievalRecord', retrieval_record)) # another object...
         else:
-            self.retrievalRecord = None
+            self.retrieval_record = None
 
 
 class Project():
@@ -158,6 +159,7 @@ class Project():
 
         self.server = server
         self.id = kwargs.get('id', id)
+        self._facets = []
         if not self.id:
             job_id = self._fetch_new_job()
             if path or "path" in kwargs:
@@ -181,10 +183,31 @@ class Project():
         except http_exceptions.RequestException: print "Request command/core/cancel-importing-job?jobID={0} failed.".format(job_id)
 
     @property
+    def facets(self):
+        return self._facets
+
+    @facets.setter
+    def facets(self, new_facet):
+        self.facets.append(new_facet)
+        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id))
+        except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        try: response = self.server.post("/command/core/rename-column?oldColumnName={0}&newColumnName={1}&project={2}".format(self._name, name, self.id))
+        except http_exceptions.RequestException: print "Request /command/core/rename-column?oldColumnName={0}&newColumnName={1}&project={2}".format(self._name, name, self.id)
+        if response and response.json.get("code",None) == "ok":
+            self._name = name
+
+    @property
     def history(self):
         try: response = self.server.post("command/core/get-history?project={0}".format(self.id))
         except http_exceptions.RequestException: print "Request command/core/get-history?project={0} failed.".format(self.id)
-        if response: return response.json
+        if response: return (HistoryEntry(**h) for h in response.json["past"]), (HistoryEntry(**h) for h in response.json["future"])
 
     @property
     def processes(self):
@@ -197,8 +220,8 @@ class Project():
         try: return self.server.post("command/core/get-project-metadata?project={0}".format(self.id))
         except http_exceptions.RequestException: print "Request command/core/get-project-metadata?project={0}".format(self.id)
 
-    def get_rows(self,offset=0,limit=-1):
-        try: response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3}".format(self.id,offset,limit,randint(1000000000000,1999999999999)))
+    def get_rows(self,offset=0,limit=-1,mode="row-based"):
+        try: response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3}".format(self.id,offset,limit,randint(1000000000000,1999999999999)), **{"data":{"engine":{"facets":[f.refine_formatted for f in self.facets],"mode":mode}, "sorting":{"criteria":[]}}})
         except http_exceptions.RequestException: print "Request command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3} failed.".format(self.id,offset,limit,randint(1000000000000,1999999999999))
         if response: return response.json
 
@@ -208,7 +231,7 @@ class Project():
         if response and response.json.get("status") == "error": print "Request command/core/get-importing-job-status?jobID={0} returned with error. ".format(job_id) + response.json["job"]["config"]["error"] + response.json["job"]["config"]["errorDetails"] # placeholder - do something because the only response ever is {"status":"error","message":"no such import job"} it means that the job needs to be recreated?
         elif response:
             if response.json["job"]["config"]["state"] == "error": print "Request command/core/get-importing-job-status?jobID={0} returned with error. ".format(job_id) + response.json["job"]["config"]["error"] + response.json["job"]["config"]["errorDetails"] # headers not correct
-            job = import_job_details(**response.json["job"]["config"])
+            job = ImportJobDetails(**response.json["job"]["config"])
             while job.state != "ready":
                 sleep(1)
                 try:
@@ -216,7 +239,7 @@ class Project():
                 except Exception:
                     print "Request command/core/get-importing-job-status?jobID={0} failed.".format(job_id)
                     break
-            if response: job = import_job_details(response.json["job"]["config"])
+            if response: job = ImportJobDetails(response.json["job"]["config"])
         else: raise Exception # odd scenario
         return job
 
@@ -367,3 +390,26 @@ class Project():
     def compute_facets(self):
         try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{}})
         except Exception: print "Unable to compute facets."
+
+class HistoryEntry(object):
+
+    def __init__(self, *args, **kwargs):
+        self.id = kwargs.get("id",None)
+        self.description = kwargs.get("description",None)
+        self.time = kwargs.get("time",None)
+        if self.time:
+            self.time = datetime(int(self.time[0:4]), int(self.time[5:7]), int(self.time[8:10]), hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
+
+class Facet(object):
+
+    def __init__(self, type, name, column_name, *args, **kwargs):
+        self.type = kwargs.get("type", type)
+        self.name = kwargs.get("name", name)
+        self.column_name = kwargs.get("column_name", column_name)
+        for k in kwargs.keys(): self.__dict__[k] = kwargs.get(k, None)
+
+    def refine_formatted(self):
+        key_formatted_repr = {}
+        for k in self.__dict__.keys():
+            key_formatted_repr["".join([c.capitalize() for c in k.split("_")])] = self.__dict__[k]
+        return key_formatted_repr
