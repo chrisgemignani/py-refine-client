@@ -160,6 +160,7 @@ class Project():
         self.server = server
         self.id = kwargs.get('id', id)
         self._facets = []
+        self._sort_critieria = []
         if not self.id:
             job_id = self._fetch_new_job()
             if path or "path" in kwargs:
@@ -189,7 +190,9 @@ class Project():
     @facets.setter
     def facets(self, new_facet):
         self.facets.append(new_facet)
-        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id))
+
+    def compute_facets(self, mode="row-based"):
+        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{"engine":{"facets":[f.refine_formatted for f in self.facets],"mode":mode}}})
         except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
 
     @property
@@ -202,6 +205,18 @@ class Project():
         except http_exceptions.RequestException: print "Request /command/core/rename-column?oldColumnName={0}&newColumnName={1}&project={2}".format(self._name, name, self.id)
         if response and response.json.get("code",None) == "ok":
             self._name = name
+
+    @property
+    def sort_criteria(self):
+        return self._sort_critieria
+
+    @sort_criteria.setter
+    def sort_criteria(self, sort_criterion=None):
+        # since the sort criteria are stored on the client side, passing in a sort criterion
+        # adds to the list of saved criteria and passing in a null value clears the previously
+        # saved criteria - should be of type SortCriterion
+        if sort_criterion: self._sort_critieria.append(sort_criterion)
+        else: self._sort_critieria.clear()
 
     @property
     def history(self):
@@ -221,9 +236,15 @@ class Project():
         except http_exceptions.RequestException: print "Request command/core/get-project-metadata?project={0}".format(self.id)
 
     def get_rows(self,offset=0,limit=-1,mode="row-based"):
-        try: response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3}".format(self.id,offset,limit,randint(1000000000000,1999999999999)), **{"data":{"engine":{"facets":[f.refine_formatted for f in self.facets],"mode":mode}, "sorting":{"criteria":[]}}})
+        try: response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3}".format(self.id,offset,limit,randint(1000000000000,1999999999999)), **{"data":{"engine":{"facets":[f.refine_formatted for f in self.facets],"mode":mode}, "sorting":{"criteria":[s.refine_formatted for s in self.sort_criteria]}}})
         except http_exceptions.RequestException: print "Request command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3} failed.".format(self.id,offset,limit,randint(1000000000000,1999999999999))
         if response: return response.json
+
+    def transform_column(self, column_name, grel_expression, on_error="keep-original",repeat=False, repeat_count=1):
+        # on_error options: keep-original, set-to-blank, store-error
+        # repeat default is false but can be set to true in which case repeat_count should be set to the number of iterations
+        try: response = self.server.post("command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id))
+        except http_exceptions.RequestException: print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id)
 
     def _get_import_job_status(self, job_id):
         response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
@@ -387,8 +408,13 @@ class Project():
         data_preview = self._fetch_rows(job_id).json
         self._create(job_id, mime_type, name, **kwargs)
 
-    def compute_facets(self):
-        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{}})
+    def split_multi_value_cell(self, column, key_column, separator):
+        try:
+            return self.server.post("/command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}&separator={2}&mode=plain&project={3}".format(column, key_column, separator, self.id))
+        except http_exceptions.RequestException: print "Unable to split cell."
+
+    def compute_facets(self, mode="row-based"):
+        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{"engine":{"mode":mode, "facets":[f.refine_formatted for f in self.facets]}}})
         except Exception: print "Unable to compute facets."
 
 class HistoryEntry(object):
@@ -399,6 +425,29 @@ class HistoryEntry(object):
         self.time = kwargs.get("time",None)
         if self.time:
             self.time = datetime(int(self.time[0:4]), int(self.time[5:7]), int(self.time[8:10]), hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
+
+class SortCriterion(object):
+
+    def __init__(self, column_name, column_type, reverse, blank_position=2, error_position=1, *args, **kwargs):
+        # column_type can be string, number, boolean, date
+        # string a-z default, z-a is "reverse"
+        # number smallest first is default, largest first is "reverse"
+        # date earliest first is default, latest first is "reverse"
+        # boolean false then true is default, true then false is "reverse"
+        if column_type == "string": self.case_sensitive = kwargs.get("case_sensitive",False)
+        self.column_name = column_name
+        self.column_type = column_type
+        self.reverse = reverse
+        self.blank_position = blank_position
+        self.error_position = error_position
+
+    def refine_formatted(self):
+        key_formatted_repr = {}
+        for k in self.__dict__.keys():
+            new_key = "".join([c.capitalize() for c in k.split("_")])
+            key_formatted_repr[new_key[0].lower()+new_key[1:]] = self.__dict__[k]
+        return key_formatted_repr
+
 
 class Facet(object):
 
@@ -411,5 +460,53 @@ class Facet(object):
     def refine_formatted(self):
         key_formatted_repr = {}
         for k in self.__dict__.keys():
-            key_formatted_repr["".join([c.capitalize() for c in k.split("_")])] = self.__dict__[k]
+            if k == "lower_bound": key_formatted_repr["from"] = self.__dict__[k]
+            elif k == "upper_bound": key_formatted_repr["to"] = self.__dict__[k]
+            else:
+                new_key = "".join([c.capitalize() for c in k.split("_")])
+                key_formatted_repr[new_key[0].lower()+new_key[1:]] = self.__dict__[k]
         return key_formatted_repr
+
+    class ListFacet(Facet):
+
+        def __init__(self, name, column_name, omit_blank, omit_error, selection, select_blank, select_error, invert, expression="value", *args, **kwargs):
+            Facet.__init__(self, "list", name, column_name)
+            self.expression = expression
+            self.omit_blank = omit_blank
+            self.omit_error = omit_error
+            self.selection = selection # v stands for value and l stands for label: [{"v":{"v":"video","l":"video"}}]
+            self.select_blank = select_blank
+            self.select_error = select_error
+            self.invert = invert
+
+    class RangeFacet(Facet):
+
+        def __init__(self, name, column_name, lower_bound, upper_bound, select_numeric=True, select_non_numeric=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+            Facet.__init__(self, "range", name, column_name)
+            self.expression = expression
+            self.select_numeric = select_numeric
+            self.select_non_numeric = select_non_numeric
+            self.select_blank = select_blank
+            self.select_error = select_error
+            self.lower_bound = lower_bound
+            self.upper_bound = upper_bound
+
+    class TimeRangeFacet(Facet):
+
+        def __init__(self, name, column_name, lower_bound, upper_bound, select_time=True, select_non_time=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+            Facet.__init__(self, "timerange", name, column_name)
+            self.expression = kwargs.get("expression",expression)
+            self.select_time = kwargs.get("select_time",select_time)
+            self.select_non_time = select_non_time
+            self.select_blank = select_blank
+            self.select_error = select_error
+            self.lower_bound = lower_bound
+            self.upper_bound = upper_bound
+
+    class TextFacet(Facet):
+
+        def __init__(self, name, column_name, mode="text", case_sensitive=False, query=None, *args, **kwargs):
+            Facet.__init__(self, "text", name, column_name)
+            self.mode = mode
+            self.case_sensitive = case_sensitive
+            self.query = query
