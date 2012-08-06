@@ -11,4 +11,6 @@ for f in c.formats: print f.name
 c.mime_types
 c.file_extensions
 Project(url='http://demo.mediacore.tv/api/media?type=video', **{'recordPath':["__anonymous__","media","__anonymous__"]})
-Project(url='http://demo.mediacore.tv/api/media?category=featured', **{'recordPath':["__anonymous__","media","__anonymous__"]})
+p=Project(url='http://demo.mediacore.tv/api/media?category=featured', name='testing', **{'recordPath':["__anonymous__","media","__anonymous__"]})
+p.facets
+p.destroy()

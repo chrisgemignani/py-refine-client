@@ -31,8 +31,8 @@ class RefineConfiguration(object):
 
     def __init__(self, **kwargs):
         if kwargs:
-            self.formats = (RefineFormat(name=k, **kwargs['formats'][k]) \
-                            for k in kwargs['formats'].keys())
+            self.formats = [RefineFormat(name=k, **kwargs['formats'][k]) \
+                            for k in kwargs['formats'].keys()]
             self.mime_types = kwargs['mimeTypeToFormat']
             self.file_extensions = kwargs['extensionToFormat']
         else:
@@ -86,7 +86,7 @@ class RefineServer(object):
     def projects(self):
         response = self.get("command/core/get-all-project-metadata")
         if response.status_code == http_codes.ok:
-            return (Project(id = pid) for pid in response.json['projects'].keys())
+            return [Project(id = pid) for pid in response.json['projects'].keys()]
         else: print "Request command/core/get-all-project-metadata failed."
 
     @property
@@ -117,7 +117,7 @@ class RetrievalRecord():
     """
 
     def __init__(self, files=None, download_count=None, archive_count=None, clipboard_count=None, upload_count=None, *args, **kwargs):
-        self.files = (DataSource(**f) for f in kwargs.get('files', files))
+        self.files = [DataSource(**f) for f in kwargs.get('files', files)]
         self.download_count = kwargs.get('downloadCount', download_count)
         self.archive_count = kwargs.get('archiveCount', archive_count)
         self.clipboard_count = kwargs.get('clipboardCount', clipboard_count)
@@ -168,7 +168,7 @@ class Project():
             elif url or "url" in kwargs:
                 self._create_project_from_url(kwargs.get("url", url), job_id, kwargs.get("name", name), **kwargs)
 
-    def __del__(self):
+    def destroy(self):
         if self.id:
             response = self.server.post("command/core/delete-project", **{"data":{"project":self.id}})
             if response and response.json["code"] != "ok": print "Request command/core/delete-project failed."# placeholder - do something if it fails?
@@ -255,21 +255,25 @@ class Project():
 
     def _get_import_job_status(self, job_id):
         response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
-        job = None
+        job_status = None
         if response and response.json.get("status") == "error": print "Request command/core/get-importing-job-status?jobID={0} returned with error. ".format(job_id) + response.json["job"]["config"]["error"] + response.json["job"]["config"]["errorDetails"] # placeholder - do something because the only response ever is {"status":"error","message":"no such import job"} it means that the job needs to be recreated?
         elif response:
             if response.json["job"]["config"]["state"] == "error": print "Request command/core/get-importing-job-status?jobID={0} returned with error. ".format(job_id) + response.json["job"]["config"]["error"] + response.json["job"]["config"]["errorDetails"] # headers not correct
-            job = ImportJobDetails(**response.json["job"]["config"])
-            while job.state != "ready":
+            job_status = ImportJobDetails(**response.json["job"]["config"])
+            print "STATE : " + job_status.state
+            while job_status.state != "ready" and job_status.state != "created-project":
                 sleep(1)
                 try:
                     response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
+                    job_status = ImportJobDetails(**response.json["job"]["config"])
+                    print "STATE : " + job_status.state
                 except Exception:
                     print "Request command/core/get-importing-job-status?jobID={0} failed.".format(job_id)
                     break
-            if response: job = ImportJobDetails(response.json["job"]["config"])
+            if job_status.state == "created-project":
+                self.id = response.json["job"]["config"]["projectID"]
         else: raise Exception # odd scenario
-        return job
+        return job_status
 
     def _initialize_parser(self, job_id, mime_type="application/json"):
         format = mime_type
@@ -382,7 +386,11 @@ class Project():
             headers = {'content-type':'application/x-www-form-urlencoded'}
             self.create_options["projectName"] = name
             data = "format={0}&options={1}".format(quote_plus(mime_type), quote_plus(json.dumps(self.create_options)))
-            return self.server.post("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=create-project".format(job_id), **{"data":data, "headers":headers})
+            response = self.server.post("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=create-project".format(job_id), **{"data":data, "headers":headers})
+            # _get_import_job_status returns more information with each successive request involved in the project creation process
+            # after create-project it shows the projectID and is the only way of discovering this value given a job id
+            job_status = self._get_import_job_status(job_id)
+            return response
         except http_exceptions.RequestException: raise
 
     def _create_project_from_file(self, path, job_id, name, **kwargs):
