@@ -212,9 +212,13 @@ class Project():
 
     @sort_criteria.setter
     def sort_criteria(self, sort_criterion=None):
-        # since the sort criteria are stored on the client side, passing in a sort criterion
-        # adds to the list of saved criteria and passing in a null value clears the previously
-        # saved criteria - should be of type SortCriterion
+        """
+        since the sort criteria are stored on the client side, passing in a sort criterion
+        adds to the list of saved criteria and passing in a null value clears the previously
+        saved criteria
+        sort_criterion should be of type SortCriterion
+        """
+
         if sort_criterion: self._sort_critieria.append(sort_criterion)
         else: self._sort_critieria.clear()
 
@@ -241,8 +245,11 @@ class Project():
         if response: return response.json
 
     def transform_column(self, column_name, grel_expression, on_error="keep-original",repeat=False, repeat_count=1):
-        # on_error options: keep-original, set-to-blank, store-error
-        # repeat default is false but can be set to true in which case repeat_count should be set to the number of iterations
+        """
+        on_error options: keep-original, set-to-blank, store-error
+        repeat default is false but can be set to true in which case repeat_count should be set to the number of iterations
+        """
+
         try: response = self.server.post("command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id))
         except http_exceptions.RequestException: print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id)
 
@@ -429,11 +436,14 @@ class HistoryEntry(object):
 class SortCriterion(object):
 
     def __init__(self, column_name, column_type, reverse, blank_position=2, error_position=1, *args, **kwargs):
-        # column_type can be string, number, boolean, date
-        # string a-z default, z-a is "reverse"
-        # number smallest first is default, largest first is "reverse"
-        # date earliest first is default, latest first is "reverse"
-        # boolean false then true is default, true then false is "reverse"
+        """
+        column_type can be string, number, boolean, date
+        string a-z default, z-a is "reverse"
+        number smallest first is default, largest first is "reverse"
+        date earliest first is default, latest first is "reverse"
+        boolean false then true is default, true then false is "reverse"
+        """
+
         if column_type == "string": self.case_sensitive = kwargs.get("case_sensitive",False)
         self.column_name = column_name
         self.column_type = column_type
