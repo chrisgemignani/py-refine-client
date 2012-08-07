@@ -428,9 +428,23 @@ class Project():
             return self.server.post("/command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}&separator={2}&mode=plain&project={3}".format(column, key_column, separator, self.id))
         except http_exceptions.RequestException: print "Unable to split cell."
 
+    def split_column_by_separator(self, column, separator=",", regex=False, remove_original=True, guess_cell_type=True):
+        try:
+            return self.server.post("/command/core/split-column?columnName={0}&mode=separator&project={2}&guessCellType={3}&removeOriginalColumn={4}&separator={5}&regex={6}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(separator), quote_plus(regex) if regex else "false"))
+        except http_exceptions.RequestException: print "Unable to split column."
+
+    def split_column_by_field_length(self, column, lengths, remove_original=True, guess_cell_type=True):
+        try:
+            return self.server.post("/command/core/split-column?columnName={0}&mode=lengths&project={2}&guessCellType={3}&removeOriginalColumn={4}&fieldLengths={5}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(lengths)))
+        except http_exceptions.RequestException: print "Unable to split column."
+
     def compute_facets(self, mode="row-based"):
         try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{"engine":{"mode":mode, "facets":[f.refine_formatted for f in self.facets]}}})
         except Exception: print "Unable to compute facets."
+
+    def goto_history_entry(self, history_entry, mode="row-based"):
+        try: return self.server.post("/command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id), **{"data":{"engine":{"mode":mode, "facets":[f.refine_formatted for f in self.facets]}}})
+        except http_exceptions.RequestException: print "Unable to go to history entry."
 
 class HistoryEntry(object):
 
