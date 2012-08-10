@@ -585,7 +585,7 @@ class TextFacet(Facet):
         self.mode = "text"
 
 
-class FacetComputation():
+class FacetComputation(object):
 
     def __init__(self, *args, **kwargs):
         """
