@@ -7,9 +7,10 @@ from os.path import basename
 from time import sleep
 from mimetools import choose_boundary
 from datetime import datetime
+from re import sub
 
 
-
+DEBUG = True
 
 class RefineFormat(object):
     """
@@ -72,8 +73,10 @@ class RefineServer(object):
         try:
             new_kwargs = {"data":kwargs.get("data",data),"files":kwargs.get("files",files), "headers":kwargs.get("headers",headers)}
             response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), **new_kwargs)
-            print "REQUEST URL : " + str(response.request.url) + "\nDATA : " + str(response.request.data) + "\nHEADERS : " + str(response.request.headers)
-            print "RESPONSE : " + response.text
+            if DEBUG: print "REQUEST URL : " + str(response.request.url) + \
+                            "\nDATA : " + str(response.request.data) + \
+                            "\nHEADERS : " + str(response.request.headers)+ \
+                            "\nRESPONSE : " + response.text
             return response
         except http_exceptions.RequestException: print "Request {0} failed.".format(action)
 
@@ -137,6 +140,23 @@ class ImportJobDetails():
             self.retrieval_record = None
 
 
+class ColumnDefinition():
+
+    def __init__(self, name=None, original_name=None, index=None, *args, **kwargs):
+        self.cell_index = kwargs.get("cellIndex", index)
+        self.original_name = kwargs.get("originalName", original_name)
+        self.name = kwargs.get("name", name)
+
+class RowSet():
+
+    def __init__(self, offset, limit, filtered_count, total_count, json_rows, *args, **kwargs):
+        self.offset = kwargs.get("offset", offset)
+        self.limit = kwargs.get("limit", limit)
+        self.filtered_count = kwargs.get("filtered", filtered_count)
+        self.total_count = kwargs.get("total", total_count)
+        self.rows = kwargs.get("rows", json_rows)
+
+
 class Project():
 
     def __init__(self, server=RefineServer(), id=None, path=None, url=None, name=None, *args, **kwargs):
@@ -161,6 +181,8 @@ class Project():
         self.id = kwargs.get('id', id)
         self._facets = []
         self._sort_critieria = []
+        self._columns = []
+        self.row_set = None
         if not self.id:
             job_id = self._fetch_new_job()
             if path or "path" in kwargs:
@@ -187,13 +209,11 @@ class Project():
     def facets(self):
         return self._facets
 
-    @facets.setter
-    def facets(self, new_facet):
-        self.facets.append(new_facet)
+    def append_facet(self, new_facet):
+        self._facets.append(new_facet)
 
-    def compute_facets(self, mode="row-based"):
-        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{"engine":{"facets":[f.refine_formatted for f in self.facets],"mode":mode}}})
-        except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
+    def clear_facets(self):
+        self._facets.clear()
 
     @property
     def name(self):
@@ -226,7 +246,7 @@ class Project():
     def history(self):
         try: response = self.server.post("command/core/get-history?project={0}".format(self.id))
         except http_exceptions.RequestException: print "Request command/core/get-history?project={0} failed.".format(self.id)
-        if response: return (HistoryEntry(**h) for h in response.json["past"]), (HistoryEntry(**h) for h in response.json["future"])
+        if response: return [HistoryEntry(**h) for h in response.json["past"]], [HistoryEntry(**h) for h in response.json["future"]]
 
     @property
     def processes(self):
@@ -239,10 +259,25 @@ class Project():
         try: return self.server.post("command/core/get-project-metadata?project={0}".format(self.id))
         except http_exceptions.RequestException: print "Request command/core/get-project-metadata?project={0}".format(self.id)
 
-    def get_rows(self,offset=0,limit=-1,mode="row-based"):
-        try: response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3}".format(self.id,offset,limit,randint(1000000000000,1999999999999)), **{"data":{"engine":{"facets":[f.refine_formatted for f in self.facets],"mode":mode}, "sorting":{"criteria":[s.refine_formatted for s in self.sort_criteria]}}})
-        except http_exceptions.RequestException: print "Request command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3} failed.".format(self.id,offset,limit,randint(1000000000000,1999999999999))
-        if response: return response.json
+    @property
+    def column_names(self):
+        return map(lambda c: c.name, self._columns)
+
+    @property
+    def columns(self):
+        self._fetch_models()
+        return self._columns
+
+    def rows(self, job_id=None, offset=0, limit=-1, mode="row-based"):
+        try:
+            if job_id: response = self.server.post("command/core/get-rows?importingJobID={0}&start={1}&limit={2}".format(job_id,offset,limit), **{"data":{"callback":"jsonp{0}".format(randint(1000000000000,1999999999999))}})
+            else: response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3}".format(self.id,offset,limit,randint(1000000000000,1999999999999)), **{"data":{"engine":{"facets":[f.refine_formatted() for f in self.facets],"mode":mode}, "sorting":{"criteria":[s.refine_formatted() for s in self.sort_criteria]}}})
+        except Exception: print "Unable to retrieve rows."
+        if response:
+            response = json.loads(response.text[19:-1])
+            self.row_set = RowSet(offset, limit, response["filtered"], response["total"], response["rows"])
+            return self.row_set
+        else: return None
 
     def transform_column(self, column_name, grel_expression, on_error="keep-original",repeat=False, repeat_count=1):
         """
@@ -260,13 +295,11 @@ class Project():
         elif response:
             if response.json["job"]["config"]["state"] == "error": print "Request command/core/get-importing-job-status?jobID={0} returned with error. ".format(job_id) + response.json["job"]["config"]["error"] + response.json["job"]["config"]["errorDetails"] # headers not correct
             job_status = ImportJobDetails(**response.json["job"]["config"])
-            print "STATE : " + job_status.state
             while job_status.state != "ready" and job_status.state != "created-project":
                 sleep(1)
                 try:
                     response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
                     job_status = ImportJobDetails(**response.json["job"]["config"])
-                    print "STATE : " + job_status.state
                 except Exception:
                     print "Request command/core/get-importing-job-status?jobID={0} failed.".format(job_id)
                     break
@@ -373,13 +406,15 @@ class Project():
             return self.server.post("command/core/importing-controller?controller=core/default-importing-controller&jobID={0}&subCommand=update-format-and-options".format(job_id), **{"headers":headers, "data":"format={0}&options={1}".format(quote_plus(refine_mime_type), json.dumps(self.create_options))})
         except Exception: print "Error updating format."
 
-    def _fetch_models(self, job_id):
-        try: return self.server.post("command/core/get-models?importingJobID={0}".format(job_id))
+    def _fetch_models(self, job_id=None):
+        try:
+            if job_id: response = self.server.post("command/core/get-models?importingJobID={0}".format(job_id)).json
+            else: response = self.server.post("command/core/get-models?project={0}".format(self.id)).json
         except Exception: print "Unable to retrieve model definitions."
-
-    def _fetch_rows(self, job_id, start=0, max_rows=3):
-        try: return self.server.post("command/core/get-rows?importingJobID={0}&start={1}&limit={2}".format(job_id,start,max_rows), **{"data":{"callback":"jsonp{0}".format(randint(1000000000000,1999999999999))}})
-        except Exception: print "Unable to retrieve rows."
+        if response.get("columnModel", None) and response["columnModel"].get("columns", None):
+            self._columns = [ColumnDefinition(**c) for c in response["columnModel"]["columns"]]
+            self._columns.sort(key=lambda i: i.cell_index)
+        if DEBUG: print self._columns
 
     def _create(self, job_id, mime_type, name="default", **kwargs):
         try:
@@ -399,10 +434,10 @@ class Project():
         if response and response.json: print "Failed to load data source {0}. ".format(path) + response.json # error message
         job_status = self._get_import_job_status(job_id) # polls for import completion
         mime_type = job_status.rankedFormats[0]
-        format_options = self._initialize_parser(job_id, mime_type).json
+        #format_options = self._initialize_parser(job_id, mime_type).json
         update_response = self._update_format(job_id, mime_type, **kwargs)
-        model_definitions = self._fetch_models(job_id).json
-        data_preview = self._fetch_rows(job_id).json
+        self._fetch_models(job_id)
+        #data = self.rows(job_id, 0, 10)
         self._create(job_id, mime_type, name, **kwargs)
 
     def _create_project_from_url(self, url, job_id, name, **kwargs):
@@ -417,34 +452,35 @@ class Project():
         if response and response.json:
             print "Failed to load data source {0}. ".format(url) + response.json
         job_status = self._get_import_job_status(job_id) # polls for import completion
-        format_options = self._initialize_parser(job_id, mime_type).json
+        #format_options = self._initialize_parser(job_id, mime_type).json
         update_response = self._update_format(job_id, mime_type, **kwargs)
-        model_definitions = self._fetch_models(job_id).json
-        data_preview = self._fetch_rows(job_id).json
+        self._fetch_models(job_id)
+        #data = self.rows(job_id, 0, 10)
         self._create(job_id, mime_type, name, **kwargs)
 
     def split_multi_value_cell(self, column, key_column, separator):
         try:
-            return self.server.post("/command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}&separator={2}&mode=plain&project={3}".format(column, key_column, separator, self.id))
+            response = self.server.post("command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}&separator={2}&mode=plain&project={3}".format(column, key_column, separator, self.id))
         except http_exceptions.RequestException: print "Unable to split cell."
 
     def split_column_by_separator(self, column, separator=",", regex=False, remove_original=True, guess_cell_type=True):
         try:
-            return self.server.post("/command/core/split-column?columnName={0}&mode=separator&project={2}&guessCellType={3}&removeOriginalColumn={4}&separator={5}&regex={6}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(separator), quote_plus(regex) if regex else "false"))
+            return self.server.post("command/core/split-column?columnName={0}&mode=separator&project={1}&guessCellType={2}&removeOriginalColumn={3}&separator={4}&regex={5}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(separator), quote_plus(regex) if regex else "false"))
         except http_exceptions.RequestException: print "Unable to split column."
 
     def split_column_by_field_length(self, column, lengths, remove_original=True, guess_cell_type=True):
         try:
-            return self.server.post("/command/core/split-column?columnName={0}&mode=lengths&project={2}&guessCellType={3}&removeOriginalColumn={4}&fieldLengths={5}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(lengths)))
+            return self.server.post("command/core/split-column?columnName={0}&mode=lengths&project={1}&guessCellType={2}&removeOriginalColumn={3}&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(lengths)))
         except http_exceptions.RequestException: print "Unable to split column."
 
     def compute_facets(self, mode="row-based"):
-        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{"engine":{"mode":mode, "facets":[f.refine_formatted for f in self.facets]}}})
-        except Exception: print "Unable to compute facets."
+        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{"engine":{"facets":[f.refine_formatted() for f in self.facets],"mode":mode}}})
+        except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
 
-    def goto_history_entry(self, history_entry, mode="row-based"):
-        try: return self.server.post("/command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id), **{"data":{"engine":{"mode":mode, "facets":[f.refine_formatted for f in self.facets]}}})
+    def roll_to_history_entry(self, history_entry, mode="row-based"):
+        try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id), **{"data":{"engine":{"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}}})
         except http_exceptions.RequestException: print "Unable to go to history entry."
+
 
 class HistoryEntry(object):
 
@@ -454,6 +490,7 @@ class HistoryEntry(object):
         self.time = kwargs.get("time",None)
         if self.time:
             self.time = datetime(int(self.time[0:4]), int(self.time[5:7]), int(self.time[8:10]), hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
+
 
 class SortCriterion(object):
 
@@ -499,6 +536,7 @@ class Facet(object):
                 key_formatted_repr[new_key[0].lower()+new_key[1:]] = self.__dict__[k]
         return key_formatted_repr
 
+
 class ListFacet(Facet):
 
     def __init__(self, name, column_name, omit_blank, omit_error, selection, select_blank, select_error, invert, expression="value", *args, **kwargs):
@@ -510,6 +548,7 @@ class ListFacet(Facet):
         self.select_blank = select_blank
         self.select_error = select_error
         self.invert = invert
+
 
 class RangeFacet(Facet):
 
@@ -523,6 +562,7 @@ class RangeFacet(Facet):
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
 
+
 class TimeRangeFacet(Facet):
 
     def __init__(self, name, column_name, lower_bound, upper_bound, select_time=True, select_non_time=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
@@ -534,6 +574,7 @@ class TimeRangeFacet(Facet):
         self.select_error = select_error
         self.lower_bound = lower_bound
         self.upper_bound = upper_bound
+
 
 class TextFacet(Facet):
 
