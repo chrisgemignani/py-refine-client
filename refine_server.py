@@ -437,10 +437,8 @@ class Project():
         if response and response.json: print "Failed to load data source {0}. ".format(path) + response.json # error message
         job_status = self._get_import_job_status(job_id) # polls for import completion
         mime_type = job_status.rankedFormats[0]
-        #format_options = self._initialize_parser(job_id, mime_type).json
         update_response = self._update_format(job_id, mime_type, **kwargs)
         self._fetch_models(job_id)
-        #data = self.rows(job_id, 0, 10)
         self._create(job_id, mime_type, name, **kwargs)
 
     def _create_project_from_url(self, url, job_id, name, **kwargs):
@@ -455,10 +453,8 @@ class Project():
         if response and response.json:
             print "Failed to load data source {0}. ".format(url) + response.json
         job_status = self._get_import_job_status(job_id) # polls for import completion
-        #format_options = self._initialize_parser(job_id, mime_type).json
         update_response = self._update_format(job_id, mime_type, **kwargs)
         self._fetch_models(job_id)
-        #data = self.rows(job_id, 0, 10)
         self._create(job_id, mime_type, name, **kwargs)
 
     def split_multi_value_cell(self, column, key_column, separator):
