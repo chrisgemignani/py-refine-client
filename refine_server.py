@@ -464,12 +464,14 @@ class Project():
 
     def split_column_by_separator(self, column, separator=",", regex=False, remove_original=True, guess_cell_type=True):
         try:
-            return self.server.post("command/core/split-column?columnName={0}&mode=separator&project={1}&guessCellType={2}&removeOriginalColumn={3}&separator={4}&regex={5}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(separator), quote_plus(regex) if regex else "false"))
+            response = self.server.post("command/core/split-column?columnName={0}&mode=separator&project={1}&guessCellType={2}&removeOriginalColumn={3}&separator={4}&regex={5}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(separator), quote_plus(regex) if regex else "false"))
+            self._fetch_models()
         except http_exceptions.RequestException: print "Unable to split column."
 
     def split_column_by_field_length(self, column, lengths, remove_original=True, guess_cell_type=True):
         try:
             return self.server.post("command/core/split-column?columnName={0}&mode=lengths&project={1}&guessCellType={2}&removeOriginalColumn={3}&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(lengths)))
+            self._fetch_models()
         except http_exceptions.RequestException: print "Unable to split column."
 
     def compute_facets(self, mode="row-based"):
