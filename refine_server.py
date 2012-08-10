@@ -147,6 +147,7 @@ class ColumnDefinition():
         self.original_name = kwargs.get("originalName", original_name)
         self.name = kwargs.get("name", name)
 
+
 class RowSet():
 
     def __init__(self, offset, limit, filtered_count, total_count, json_rows, *args, **kwargs):
@@ -244,7 +245,7 @@ class Project():
 
     @property
     def history(self):
-        try: response = self.server.post("command/core/get-history?project={0}".format(self.id))
+        try: response = self.server.get("command/core/get-history?project={0}".format(self.id))
         except http_exceptions.RequestException: print "Request command/core/get-history?project={0} failed.".format(self.id)
         if response: return [HistoryEntry(**h) for h in response.json["past"]], [HistoryEntry(**h) for h in response.json["future"]]
 
@@ -271,7 +272,9 @@ class Project():
     def rows(self, job_id=None, offset=0, limit=-1, mode="row-based"):
         try:
             if job_id: response = self.server.post("command/core/get-rows?importingJobID={0}&start={1}&limit={2}".format(job_id,offset,limit), **{"data":{"callback":"jsonp{0}".format(randint(1000000000000,1999999999999))}})
-            else: response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback=jsonp{3}".format(self.id,offset,limit,randint(1000000000000,1999999999999)), **{"data":{"engine":{"facets":[f.refine_formatted() for f in self.facets],"mode":mode}, "sorting":{"criteria":[s.refine_formatted() for s in self.sort_criteria]}}})
+            else:
+                callback="jsonp{0}".format(randint(1000000000000,1999999999999))
+                response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback={3}".format(self.id,offset,limit,callback), **{"data":"engine={0}&sorting={1}&callback={2}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}), json.dumps({"criteria":[s.refine_formatted() for s in self.sort_criteria]}), callback)})
         except Exception: print "Unable to retrieve rows."
         if response:
             response = json.loads(response.text[19:-1])
@@ -474,11 +477,13 @@ class Project():
         except http_exceptions.RequestException: print "Unable to split column."
 
     def compute_facets(self, mode="row-based"):
-        try: return self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":{"engine":{"facets":[f.refine_formatted() for f in self.facets],"mode":mode}}})
+        try:
+            response = self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}))})
+            return [FacetComputation(**f) for f in response.json["facets"]]
         except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
 
     def roll_to_history_entry(self, history_entry, mode="row-based"):
-        try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id), **{"data":{"engine":{"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}}})
+        try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id), **{"data":{"engine={0}".format(json.dumps({"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}))}})
         except http_exceptions.RequestException: print "Unable to go to history entry."
 
 
@@ -519,7 +524,6 @@ class SortCriterion(object):
 
 
 class Facet(object):
-
     def __init__(self, type, name, column_name, *args, **kwargs):
         self.type = kwargs.get("type", type)
         self.name = kwargs.get("name", name)
@@ -578,8 +582,38 @@ class TimeRangeFacet(Facet):
 
 class TextFacet(Facet):
 
-    def __init__(self, name, column_name, mode="text", case_sensitive=False, query=None, *args, **kwargs):
+    def __init__(self, name, column_name, query, case_sensitive=False, *args, **kwargs):
         Facet.__init__(self, "text", name, column_name)
-        self.mode = mode
         self.case_sensitive = case_sensitive
         self.query = query
+        self.mode = "text"
+
+
+class FacetComputation():
+
+    def __init__(self, *args, **kwargs):
+        """
+            a range/timerange facet will expose the following properties (in addition to repeating the properties that make up the facet):
+                min - minimum value for all values in column
+                max - maximum value for all values in column
+                step - the step for the bins (below)
+                bins - an array of counts for every stepped (above) value considering ALL facets
+                base_bins - an array of counts for every stepped (above) value considering JUST THIS facet
+                base_numeric_count - the total number of rows
+                base_non_numeric_count - the total number of non-numeric cells in column
+                base_blank_count - the total number of blank cells in column
+                base_error_count - the total number of cells that errored on application of the facet
+                numeric_count - the total number of cells resulting from ALL facets combined
+                non_numeric_count - the count of non-numeric  cells in the column for JUST THIS facet
+                blank_count - the count of blank cells for JUST THIS facet
+                error_count - the count of error cells for JUST THIS facet
+
+            a list facet will expose only one property, an array:
+                choices
+                    each entry in choices is a dict of the following form:
+                        v: a dict with keys "v" for value and "l" for label
+                        c: a count of the number of rows matching the above value for ALL facets combined
+                        s: a Boolean indicating whether this value is selected as part of this facet (allowing for multi-select)
+
+        """
+        for k in kwargs.keys(): self.__dict__[k] = kwargs.get(k, None)

@@ -1,4 +1,4 @@
-from refine_server import RangeFacet, Project, RefineServer
+from refine_server import ListFacet, TextFacet, RangeFacet, Project, RefineServer
 
 
 try:
@@ -36,12 +36,28 @@ try:
     "Project has {0} facets:\n".format(len(p3.facets))
     print p3.facets
     # Insert facet test here...
-    range_facet = RangeFacet("test", p3.column_names[2], 18, 21)
-    p3.append_facet(range_facet)
+    range_facet = RangeFacet("AGE", "AGE", 18, 21)
+    history = p3.history
     data = p3.rows(None, 5, 3)
+    p3.append_facet(range_facet)
+    comps = p3.compute_facets()
+    print comps
+    list_facet = ListFacet("STATE", "STATE", False, False, [{"v":{"v":"Florida","l":"Florida"}}], True, True, False)
+    history = p3.history
+    data = p3.rows(None, 5, 3)
+    p3.append_facet(list_facet)
+    comps = p3.compute_facets()
+    print comps
+    text_facet = TextFacet("SEX", "SEX", "M")
+    history = p3.history
+    data = p3.rows(None, 5, 3)
+    p3.append_facet(text_facet)
+    comps = p3.compute_facets()
+    print comps
+    "Project has {0} facets:\n".format(len(p3.facets))
+    print "History:\n{0}".format(history)
     print "Of {0} total rows {1} were returned after applying facets.".format(data.total_count, data.filtered_count)
     print "Sample row:\n{0}\n".format(data.rows[0])
-    p3.compute_facets()
     "Project has {0} facets:\n".format(len(p3.facets))
     print p3.facets
     "Destroying project."
