@@ -541,28 +541,28 @@ class Facet(object):
 
 class ListFacet(Facet):
 
-    def __init__(self, name, column_name, omit_blank, omit_error, selection, select_blank, select_error, invert, expression="value", *args, **kwargs):
+    def __init__(self, name, column_name, omit_blank=False, omit_error=False, selection=[], select_blank=True, select_error=True, invert=False, expression="value", *args, **kwargs):
         Facet.__init__(self, "list", name, column_name)
-        self.expression = expression
-        self.omit_blank = omit_blank
-        self.omit_error = omit_error
-        self.selection = selection # v stands for value and l stands for label: [{"v":{"v":"video","l":"video"}}]
-        self.select_blank = select_blank
-        self.select_error = select_error
-        self.invert = invert
+        self.expression = kwargs.get("expression", expression)
+        self.omit_blank = kwargs.get("omit_blank", omit_blank)
+        self.omit_error = kwargs.get("omit_error", omit_error)
+        self.selection = kwargs.get("selection",selection) # v stands for value and l stands for label: [{"v":{"v":"video","l":"video"}}]
+        self.select_blank = kwargs.get("select_blank",select_blank)
+        self.select_error = kwargs.get("select_error",select_error)
+        self.invert = kwargs.get("invert",invert)
 
 
 class RangeFacet(Facet):
 
     def __init__(self, name, column_name, lower_bound, upper_bound, select_numeric=True, select_non_numeric=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
         Facet.__init__(self, "range", name, column_name)
-        self.expression = expression
-        self.select_numeric = select_numeric
-        self.select_non_numeric = select_non_numeric
-        self.select_blank = select_blank
-        self.select_error = select_error
-        self.lower_bound = lower_bound
-        self.upper_bound = upper_bound
+        self.expression =  kwargs.get("expression", expression)
+        self.select_numeric = kwargs.get("select_numeric", select_numeric)
+        self.select_non_numeric = kwargs.get("select_non_numeric", select_non_numeric)
+        self.select_blank = kwargs.get("select_blank", select_blank)
+        self.select_error = kwargs.get("select_error", select_error)
+        self.lower_bound = kwargs.get("lower_bound", lower_bound)
+        self.upper_bound = kwargs.get("upper_bound", upper_bound)
 
 
 class TimeRangeFacet(Facet):
@@ -571,19 +571,19 @@ class TimeRangeFacet(Facet):
         Facet.__init__(self, "timerange", name, column_name)
         self.expression = kwargs.get("expression",expression)
         self.select_time = kwargs.get("select_time",select_time)
-        self.select_non_time = select_non_time
-        self.select_blank = select_blank
-        self.select_error = select_error
-        self.lower_bound = lower_bound
-        self.upper_bound = upper_bound
+        self.select_non_time = kwargs.get("select_non_time", select_non_time)
+        self.select_blank = kwargs.get("select_blank", select_blank)
+        self.select_error = kwargs.get("select_error", select_error)
+        self.lower_bound = kwargs.get("lower_bound", lower_bound)
+        self.upper_bound = kwargs.get("upper_bound", upper_bound)
 
 
 class TextFacet(Facet):
 
     def __init__(self, name, column_name, query, case_sensitive=False, *args, **kwargs):
         Facet.__init__(self, "text", name, column_name)
-        self.case_sensitive = case_sensitive
-        self.query = query
+        self.case_sensitive = kwargs.get("case_sensitive", case_sensitive)
+        self.query = kwargs.get("query", query)
         self.mode = "text"
 
 
