@@ -480,6 +480,12 @@ class Project():
             return [FacetComputation(**f) for f in response.json["facets"]]
         except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
 
+    def test_facets(self, test_facets, mode="row-based"):
+        try:
+            response = self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in test_facets],"mode":mode}))})
+            return [FacetComputation(**f) for f in response.json["facets"]]
+        except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed for test case.".format(self.id)
+
     def roll_to_history_entry(self, history_entry, mode="row-based"):
         try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id), **{"data":{"engine={0}".format(json.dumps({"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}))}})
         except http_exceptions.RequestException: print "Unable to go to history entry."
