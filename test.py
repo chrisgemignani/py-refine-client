@@ -1,4 +1,4 @@
-from refine_server import ListFacet, TextFacet, RangeFacet, Project, RefineServer
+from refine_server import ListFacet, TextFacet, TimeRangeFacet, RangeFacet, Project, RefineServer
 
 
 try:
@@ -16,7 +16,16 @@ print server_configuration.mime_types
 print "File Extensions:\n"
 print server_configuration.file_extensions
 print "Testing project creation using demo.mediacore.tv JSON API..."
-try: p=Project(url='http://demo.mediacore.tv/api/media?category=featured', name='testing', **{'recordPath':["__anonymous__","media","__anonymous__"]})
+try:
+    p=Project(url='http://demo.mediacore.tv/api/media?category=featured', name='testing', **{'recordPath':["__anonymous__","media","__anonymous__"]})
+    p.transform_column("__anonymous__ - modified_on", "value.toDate()")
+    timerange_facet = TimeRangeFacet("__anonymous__ - modified_on", "__anonymous__ - modified_on", -6470126652719022000, -2305843009213694000)
+    history = p.history
+    data = p.rows(None, 5, 3)
+    p.append_facet(timerange_facet)
+    comps = p.compute_facets()
+    print comps
+    p.destroy()
 except Exception, e: raise
 print "Testing project creation using media.juiceanalytics.com CSV API..."
 try:
