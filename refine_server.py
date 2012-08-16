@@ -10,7 +10,7 @@ from datetime import datetime
 from re import sub
 
 
-DEBUG = True
+DEBUG = False
 
 class RefineFormat(object):
     """
@@ -23,6 +23,12 @@ class RefineFormat(object):
         self.label = kwargs.get('label', label)
         self.download = kwargs.get('download', download)
         self.uiClass = kwargs.get('uiClass', ui_class)
+
+    def __unicode__(self):
+        return self.name
+
+    def __str__(self):
+        return self.__unicode__()
 
 
 class RefineConfiguration(object):
@@ -41,6 +47,12 @@ class RefineConfiguration(object):
             self.mime_types = None
             self.file_extensions = None
 
+    def __unicode__(self):
+        return "Allowed MIME Types: " + ",".join(self.mime_types)
+
+    def __str__(self):
+        return self.__unicode__()
+
 
 class RefineVersion(object):
     """
@@ -53,6 +65,12 @@ class RefineVersion(object):
         self.revision = kwargs.get('revision', revision)
         self.version = kwargs.get('version', version)
 
+    def __unicode__(self):
+        return self.full_version
+
+    def __str__(self):
+        return self.__unicode__()
+
 
 class RefineServer(object):
     """
@@ -63,6 +81,12 @@ class RefineServer(object):
         self.protocol = kwargs.get('protocol', protocol)
         self.host = kwargs.get('host', host)
         self.port = kwargs.get('port', port)
+
+    def __unicode__(self):
+        return "{0}://{1}:{2}".format(self.protocol, self.host, self.port)
+
+    def __str__(self):
+        return self.__unicode__()
 
     def get(self, action):
         try: return http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
@@ -106,12 +130,18 @@ class DataSource(object):
     """
 
     def __init__(self, declared_mime_type=None, location=None, file_name=None, origin=None, url=None, size=None, *args, **kwargs):
-        self.declared_mime_type=kwargs.get('declaredMimeType', declared_mime_type)
+        self.declared_mime_type = kwargs.get('declaredMimeType', declared_mime_type)
         self.location = kwargs.get('location', location)
         self.fileName = kwargs.get('fileName', file_name)
         self.origin = kwargs.get('origin', origin)
         self.url = kwargs.get('url', url)
         self.size = kwargs.get('size', size)
+
+    def __unicode__(self):
+        return "{0} {1} {2} {3}".format(self.location, self.fileName, self.declared_mime_type, self.size)
+
+    def __str__(self):
+        return self.__unicode__()
 
 
 class RetrievalRecord():
@@ -126,18 +156,30 @@ class RetrievalRecord():
         self.clipboard_count = kwargs.get('clipboardCount', clipboard_count)
         self.upload_count = kwargs.get('uploadCount', upload_count)
 
+    def __unicode__(self):
+        return "{0} downloads, {1} archives, {2} clipboards, {3} uploads\n{4}".format(self.download_count, self.archive_count, self.clipboard_count, self.upload_count, unicode(self.files))
+
+    def __str__(self):
+        return self.__unicode__()
+
 
 class ImportJobDetails():
 
     def __init__(self, ranked_formats=None, has_data=None, state=None, file_selection=None, retrieval_record=None, *args, **kwargs):
         self.ranked_formats = kwargs.get('rankedFormats', ranked_formats) # array of mime types in order of best guess for this data source
-        self.has_data = kwargs.get('hasData', has_data) # boolean
-        self.state = kwargs.get('state', state) # "ready"
-        self.file_selection = kwargs.get('fileSelection', file_selection) # [0]  ...what does that mean? is it an array of indices that correspond to values in retrievalRecord["files"]?
+        self.has_data = kwargs.get('hasData', has_data)
+        self.state = kwargs.get('state', state)
+        self.file_selection = kwargs.get('fileSelection', file_selection) # an array of indices that correspond to values in retrievalRecord["files"]
         if retrieval_record or "retrievalRecord" in kwargs:
             self.retrieval_record = RetrievalRecord(**kwargs.get('retrievalRecord', retrieval_record)) # another object...
         else:
             self.retrieval_record = None
+
+    def __unicode__(self):
+        return "Job is {0} and {1}\nFormats (most likely first):\n{2}".format(self.state, "has data" if self.has_data else "has no data", unicode(self.ranked_formats))
+
+    def __str__(self):
+        return self.__unicode__()
 
 
 class ColumnDefinition():
@@ -146,6 +188,12 @@ class ColumnDefinition():
         self.cell_index = kwargs.get("cellIndex", index)
         self.original_name = kwargs.get("originalName", original_name)
         self.name = kwargs.get("name", name)
+
+    def __unicode__(self):
+        return "[{0}] {1} (originally named {2})".format(self.cell_index, self.name, self.original_name)
+
+    def __str__(self):
+        return self.__unicode__()
 
 
 class RowSet():
@@ -157,6 +205,11 @@ class RowSet():
         self.total_count = kwargs.get("total", total_count)
         self.rows = kwargs.get("rows", json_rows)
 
+    def __unicode__(self):
+        return "{0} rows starting at {1} of {2} total rows ({3} filtered rows)\nSample Row:\n".format(self.limit, self.offset, self.total_count, self.filtered_count, unicode(self.rows[0]))
+
+    def __str__(self):
+        return self.__unicode__()
 
 class Project():
 
@@ -190,6 +243,12 @@ class Project():
                 self._create_project_from_file(kwargs.get("path", path), job_id, kwargs.get("name", name), **kwargs)
             elif url or "url" in kwargs:
                 self._create_project_from_url(kwargs.get("url", url), job_id, kwargs.get("name", name), **kwargs)
+
+    def __unicode__(self):
+        return "Project ID {0} using server at {1}".format(self.id, unicode(self.server))
+
+    def __str__(self):
+        return self.__unicode__()
 
     def destroy(self):
         if self.id:
@@ -512,6 +571,11 @@ class HistoryEntry(object):
         if self.time:
             self.time = datetime(int(self.time[0:4]), int(self.time[5:7]), int(self.time[8:10]), hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
 
+    def __unicode__(self):
+        return "{0} {1} [ID:{2}]".format(self.time, self.description, self.id)
+
+    def __str__(self):
+        return self.__unicode__()
 
 class SortCriterion(object):
 
@@ -531,6 +595,15 @@ class SortCriterion(object):
         self.blank_position = blank_position
         self.error_position = error_position
 
+    def __unicode__(self):
+        return "Sort by {0} ({1}) {2}, with blank rows {3} and error rows {4}".format(self.column_name, self.column_type,
+                "descending" if self.reverse else "ascending",
+                "first" if self.blank_position == 0 else "last" if self.blank_position == 2 else "second",
+                "first" if self.error_position == 0 else "last" if self.error_position == 2 else "second")
+
+    def __str__(self):
+        return self.__unicode__()
+
     def refine_formatted(self):
         key_formatted_repr = {}
         for k in self.__dict__.keys():
@@ -540,11 +613,18 @@ class SortCriterion(object):
 
 
 class Facet(object):
+
     def __init__(self, type, name, column_name, *args, **kwargs):
         self.type = kwargs.get("type", type)
         self.name = kwargs.get("name", name)
         self.column_name = kwargs.get("column_name", column_name)
         for k in kwargs.keys(): self.__dict__[k] = kwargs.get(k, None)
+
+    def __unicode__(self):
+        return "{0} facet on {1}".format(self.type, self.column_name)
+
+    def __str__(self):
+        return self.__unicode__()
 
     def refine_formatted(self):
         key_formatted_repr = {}
@@ -573,6 +653,12 @@ class ListFacet(Facet):
         self.select_error = kwargs.get("select_error",select_error)
         self.invert = kwargs.get("invert",invert)
 
+    def __unicode__(self):
+        return "List facet on {0} \"{1}\"".format(self.column_name, self.expression)
+
+    def __str__(self):
+        return self.__unicode__()
+
 
 class RangeFacet(Facet):
 
@@ -590,6 +676,12 @@ class RangeFacet(Facet):
         if lb: self.lower_bound = lb
         ub = kwargs.get("upper_bound", upper_bound)
         if ub: self.upper_bound = ub
+
+    def __unicode__(self):
+        return "Range facet on {0} \"{1}\"".format(self.column_name, self.expression)
+
+    def __str__(self):
+        return self.__unicode__()
 
 
 class TimeRangeFacet(Facet):
@@ -609,6 +701,12 @@ class TimeRangeFacet(Facet):
         ub = kwargs.get("upper_bound", upper_bound)
         if ub: self.upper_bound = ub
 
+    def __unicode__(self):
+        return "Time range facet on {0} \"{1}\"".format(self.column_name, self.expression)
+
+    def __str__(self):
+        return self.__unicode__()
+
 
 class TextFacet(Facet):
 
@@ -621,6 +719,12 @@ class TextFacet(Facet):
         self.case_sensitive = kwargs.get("case_sensitive", case_sensitive)
         self.query = (kwargs.get("query", query)).replace("%",quote("%"))
         self.mode = "text"
+
+    def __unicode__(self):
+        return "Text facet on {0} \"{1}\"".format(self.column_name, self.query)
+
+    def __str__(self):
+        return self.__unicode__()
 
 
 class FacetComputation(object):
@@ -651,3 +755,9 @@ class FacetComputation(object):
 
         """
         for k in kwargs.keys(): self.__dict__[k] = kwargs.get(k, None)
+
+    def __unicode__(self):
+        return "\n".join(["{0}: {1}".format(k, self.__dict__[k]) for k in self.__dict__.keys()])
+
+    def __str__(self):
+        return self.__unicode__()
