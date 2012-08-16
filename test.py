@@ -1,4 +1,4 @@
-from refine_server import ListFacet, TextFacet, TimeRangeFacet, RangeFacet, Project, RefineServer
+from refine_server import Facet, ListFacet, TextFacet, TimeRangeFacet, RangeFacet, Project, RefineServer
 
 
 try:
@@ -19,8 +19,7 @@ print "Testing project creation using demo.mediacore.tv JSON API..."
 try:
     p=Project(url='http://demo.mediacore.tv/api/media?category=featured', name='testing', **{'recordPath':["__anonymous__","media","__anonymous__"]})
     p.transform_column("__anonymous__ - modified_on", "value.toDate()")
-    timerange_facet = TimeRangeFacet("__anonymous__ - modified_on", "__anonymous__ - modified_on", -6470126652719022000, -2305843009213694000)
-    comps = p.test_facets([timerange_facet])
+    comps = p.test_facets([TimeRangeFacet("__anonymous__ - modified_on", "__anonymous__ - modified_on", -6470126652719022000, -2305843009213694000)])
     print comps
     p.destroy()
 except Exception, e: raise
@@ -66,6 +65,7 @@ try:
     print "Sample row:\n{0}\n".format(data.rows[0])
     "Project has {0} facets:\n".format(len(p3.facets))
     print p3.facets
+    p3.test_facets([RangeFacet("STATE", "STATE", **{"selectBlank": True, "selectError": True, "expression": "if(endsWith(value, \"%\"), value.replace(\"%\",\"\").replace(\",\",\"\"), \"NaN\").toNumber()", "selectNumeric": True})])
     "Destroying project."
     p3.destroy()
 except Exception, e: raise

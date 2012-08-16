@@ -1,5 +1,5 @@
 from requests import get as http_get, post as http_post, codes as http_codes, exceptions as http_exceptions
-from urllib import quote_plus
+from urllib import quote, quote_plus
 from random import randint
 try: import simplejson as json
 except ImportError: import json
@@ -282,6 +282,18 @@ class Project():
             return self.row_set
         else: return None
 
+    def export(self, filename, template, format="template", prefix="{\"rows\":[", suffix="]}", separator=",", *args, **kwargs):
+        data = {"project": self.id,
+                "template": kwargs.get("template", template),
+                "format" : kwargs.get("format", format),
+                "prefix" : kwargs.get("prefix", prefix),
+                "suffix" : kwargs.get("suffix", suffix),
+                "separator" : kwargs.get("separator", separator)}
+        try:
+            response = self.server.post("command/core/export-rows/{0}".format(filename), **{"data":data})
+        except http_exceptions.RequestException: print "Failed to export rows."
+        return response.json
+
     def transform_column(self, column_name, grel_expression, on_error="keep-original",repeat=False, repeat_count=1):
         """
         on_error options: keep-original, set-to-blank, store-error
@@ -548,8 +560,12 @@ class Facet(object):
 class ListFacet(Facet):
 
     def __init__(self, name, column_name, omit_blank=False, omit_error=False, selection=[], select_blank=True, select_error=True, invert=False, expression="value", *args, **kwargs):
+        """
+        expression is required
+        selection is required
+        """
         Facet.__init__(self, "list", name, column_name)
-        self.expression = kwargs.get("expression", expression)
+        self.expression = ("grel:" + kwargs.get("expression", expression)).replace("%",quote("%"))
         self.omit_blank = kwargs.get("omit_blank", omit_blank)
         self.omit_error = kwargs.get("omit_error", omit_error)
         self.selection = kwargs.get("selection",selection) # v stands for value and l stands for label: [{"v":{"v":"video","l":"video"}}]
@@ -560,36 +576,50 @@ class ListFacet(Facet):
 
 class RangeFacet(Facet):
 
-    def __init__(self, name, column_name, lower_bound, upper_bound, select_numeric=True, select_non_numeric=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+    def __init__(self, name, column_name, lower_bound=None, upper_bound=None, select_numeric=True, select_non_numeric=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+        """
+        expression is required
+        """
         Facet.__init__(self, "range", name, column_name)
-        self.expression =  kwargs.get("expression", expression)
+        self.expression =  ("grel:" + kwargs.get("expression", expression)).replace("%",quote("%"))
         self.select_numeric = kwargs.get("select_numeric", select_numeric)
         self.select_non_numeric = kwargs.get("select_non_numeric", select_non_numeric)
         self.select_blank = kwargs.get("select_blank", select_blank)
         self.select_error = kwargs.get("select_error", select_error)
-        self.lower_bound = kwargs.get("lower_bound", lower_bound)
-        self.upper_bound = kwargs.get("upper_bound", upper_bound)
+        lb = kwargs.get("lower_bound", lower_bound)
+        if lb: self.lower_bound = lb
+        ub = kwargs.get("upper_bound", upper_bound)
+        if ub: self.upper_bound = ub
 
 
 class TimeRangeFacet(Facet):
 
-    def __init__(self, name, column_name, lower_bound, upper_bound, select_time=True, select_non_time=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+    def __init__(self, name, column_name, lower_bound=None, upper_bound=None, select_time=True, select_non_time=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+        """
+        expression is required
+        """
         Facet.__init__(self, "timerange", name, column_name)
-        self.expression = kwargs.get("expression",expression)
+        self.expression = ("grel:" + kwargs.get("expression",expression)).replace("%",quote("%"))
         self.select_time = kwargs.get("select_time",select_time)
         self.select_non_time = kwargs.get("select_non_time", select_non_time)
         self.select_blank = kwargs.get("select_blank", select_blank)
         self.select_error = kwargs.get("select_error", select_error)
-        self.lower_bound = kwargs.get("lower_bound", lower_bound)
-        self.upper_bound = kwargs.get("upper_bound", upper_bound)
+        lb = kwargs.get("lower_bound", lower_bound)
+        if lb: self.lower_bound = lb
+        ub = kwargs.get("upper_bound", upper_bound)
+        if ub: self.upper_bound = ub
 
 
 class TextFacet(Facet):
 
-    def __init__(self, name, column_name, query, case_sensitive=False, *args, **kwargs):
+    def __init__(self, name, column_name, query=None, case_sensitive=False, *args, **kwargs):
+        """
+        case_sensitive is required
+        mode is required
+        """
         Facet.__init__(self, "text", name, column_name)
         self.case_sensitive = kwargs.get("case_sensitive", case_sensitive)
-        self.query = kwargs.get("query", query)
+        self.query = (kwargs.get("query", query)).replace("%",quote("%"))
         self.mode = "text"
 
 
