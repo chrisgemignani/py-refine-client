@@ -38,8 +38,7 @@ class RefineConfiguration(object):
 
     def __init__(self, **kwargs):
         if kwargs:
-            self.formats = [RefineFormat(name=k, **kwargs['formats'][k]) \
-                            for k in kwargs['formats'].keys()]
+            self.formats = [RefineFormat(name=k, **kwargs['formats'][k]) for k in kwargs['formats'].keys()]
             self.mime_types = kwargs['mimeTypeToFormat']
             self.file_extensions = kwargs['extensionToFormat']
         else:
@@ -95,12 +94,15 @@ class RefineServer(object):
 
     def post(self, action, data=None, headers=None, files=None, **kwargs):
         try:
-            new_kwargs = {"data":kwargs.get("data",data),"files":kwargs.get("files",files), "headers":kwargs.get("headers",headers)}
+            new_kwargs = {"data":kwargs.get("data",data),
+                          "files":kwargs.get("files",files),
+                          "headers":kwargs.get("headers",headers)}
             response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), **new_kwargs)
-            if DEBUG: print "REQUEST URL : " + str(response.request.url) + \
-                            "\nDATA : " + str(response.request.data) + \
-                            "\nHEADERS : " + str(response.request.headers)+ \
-                            "\nRESPONSE : " + response.text
+            if DEBUG: print(("REQUEST URL : {0}\nDATA : {1}"
+                             "\nHEADERS : {2}\nRESPONSE : {3}").format(str(response.request.url),
+                                                                        str(response.request.data),
+                                                                        str(response.request.headers),
+                                                                        response.text))
             return response
         except http_exceptions.RequestException: print "Request {0} failed.".format(action)
 
@@ -129,7 +131,8 @@ class DataSource(object):
     Docstring
     """
 
-    def __init__(self, declared_mime_type=None, location=None, file_name=None, origin=None, url=None, size=None, *args, **kwargs):
+    def __init__(self, declared_mime_type=None, location=None, file_name=None, origin=None, url=None,
+                 size=None, *args, **kwargs):
         self.declared_mime_type = kwargs.get('declaredMimeType', declared_mime_type)
         self.location = kwargs.get('location', location)
         self.fileName = kwargs.get('fileName', file_name)
@@ -149,7 +152,8 @@ class RetrievalRecord():
     Docstring
     """
 
-    def __init__(self, files=None, download_count=None, archive_count=None, clipboard_count=None, upload_count=None, *args, **kwargs):
+    def __init__(self, files=None, download_count=None, archive_count=None, clipboard_count=None,
+                 upload_count=None, *args, **kwargs):
         self.files = [DataSource(**f) for f in kwargs.get('files', files)]
         self.download_count = kwargs.get('downloadCount', download_count)
         self.archive_count = kwargs.get('archiveCount', archive_count)
@@ -157,7 +161,9 @@ class RetrievalRecord():
         self.upload_count = kwargs.get('uploadCount', upload_count)
 
     def __unicode__(self):
-        return "{0} downloads, {1} archives, {2} clipboards, {3} uploads\n{4}".format(self.download_count, self.archive_count, self.clipboard_count, self.upload_count, unicode(self.files))
+        return ("{0} downloads, {1} archives, "
+                "{2} clipboards, {3} uploads\n{4}").format(self.download_count, self.archive_count,
+                                                           self.clipboard_count, self.upload_count, str(self.files))
 
     def __str__(self):
         return self.__unicode__()
@@ -165,18 +171,21 @@ class RetrievalRecord():
 
 class ImportJobDetails():
 
-    def __init__(self, ranked_formats=None, has_data=None, state=None, file_selection=None, retrieval_record=None, *args, **kwargs):
+    def __init__(self, ranked_formats=None, has_data=None, state=None, file_selection=None,
+                 retrieval_record=None, *args, **kwargs):
         self.ranked_formats = kwargs.get('rankedFormats', ranked_formats) # array of mime types in order of best guess for this data source
         self.has_data = kwargs.get('hasData', has_data)
         self.state = kwargs.get('state', state)
         self.file_selection = kwargs.get('fileSelection', file_selection) # an array of indices that correspond to values in retrievalRecord["files"]
         if retrieval_record or "retrievalRecord" in kwargs:
-            self.retrieval_record = RetrievalRecord(**kwargs.get('retrievalRecord', retrieval_record)) # another object...
+            self.retrieval_record = RetrievalRecord(**kwargs.get('retrievalRecord', retrieval_record))
         else:
             self.retrieval_record = None
 
     def __unicode__(self):
-        return "Job is {0} and {1}\nFormats (most likely first):\n{2}".format(self.state, "has data" if self.has_data else "has no data", unicode(self.ranked_formats))
+        return ("Job is {0} and {1}"
+                "\nFormats (most likely first):\n{2}").format(self.state, "has data" if self.has_data else "has no data",
+                                                              str(self.ranked_formats))
 
     def __str__(self):
         return self.__unicode__()
@@ -206,7 +215,9 @@ class RowSet():
         self.rows = kwargs.get("rows", json_rows)
 
     def __unicode__(self):
-        return "{0} rows starting at {1} of {2} total rows ({3} filtered rows)\nSample Row:\n".format(self.limit, self.offset, self.total_count, self.filtered_count, unicode(self.rows[0]))
+        return ("{0} rows starting at {1} of {2} "
+               "total rows ({3} filtered rows)\nSample Row:\n".format(self.limit, self.offset, self.total_count,
+                                                                      self.filtered_count, str(self.rows[0])))
 
     def __str__(self):
         return self.__unicode__()
@@ -253,7 +264,7 @@ class Project():
     def destroy(self):
         if self.id:
             response = self.server.post("command/core/delete-project", **{"data":{"project":self.id}})
-            if response and response.json["code"] != "ok": print "Request command/core/delete-project failed."# placeholder - do something if it fails?
+            if response and response.json["code"] != "ok": print "Request command/core/delete-project failed."
 
     def _fetch_new_job(self):
         response = None
@@ -263,7 +274,8 @@ class Project():
 
     def _cancel_import_job(self, job_id):
         try: return self.server.post("command/core/cancel-importing-job?jobID={0}".format(job_id))
-        except http_exceptions.RequestException: print "Request command/core/cancel-importing-job?jobID={0} failed.".format(job_id)
+        except http_exceptions.RequestException: print("Request command/core/cancel-importing-job?"
+                                                       "jobID={0} failed.".format(job_id))
 
     @property
     def facets(self):
@@ -281,8 +293,10 @@ class Project():
 
     @name.setter
     def name(self, name):
-        try: response = self.server.post("/command/core/rename-column?oldColumnName={0}&newColumnName={1}&project={2}".format(self._name, name, self.id))
-        except http_exceptions.RequestException: print "Request /command/core/rename-column?oldColumnName={0}&newColumnName={1}&project={2}".format(self._name, name, self.id)
+        try: response = self.server.post(("/command/core/rename-column?oldColumnName={0}"
+                                          "&newColumnName={1}&project={2}".format(self._name, name, self.id)))
+        except http_exceptions.RequestException: print("Request /command/core/rename-column?oldColumnName={0}"
+                                                       "&newColumnName={1}&project={2}".format(self._name, name, self.id))
         if response and response.json.get("code",None) == "ok":
             self._name = name
 
@@ -330,10 +344,14 @@ class Project():
 
     def rows(self, job_id=None, offset=0, limit=-1, mode="row-based"):
         try:
-            if job_id: response = self.server.post("command/core/get-rows?importingJobID={0}&start={1}&limit={2}".format(job_id,offset,limit), **{"data":{"callback":"jsonp{0}".format(randint(1000000000000,1999999999999))}})
+            if job_id: response = self.server.post(("command/core/get-rows?importingJobID={0}&start={1}"
+                                                    "&limit={2}".format(job_id, offset, limit)),
+                                                   **{"data":{"callback":"jsonp{0}".format(randint(1000000000000,1999999999999))}})
             else:
                 callback="jsonp{0}".format(randint(1000000000000,1999999999999))
-                response = self.server.post("command/core/get-rows?project={0}&start={1}&limit={2}&callback={3}".format(self.id,offset,limit,callback), **{"data":"engine={0}&sorting={1}&callback={2}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}), json.dumps({"criteria":[s.refine_formatted() for s in self.sort_criteria]}), callback)})
+                response = self.server.post(("command/core/get-rows?project={0}&start={1}&limit={2}"
+                                             "&callback={3}".format(self.id,offset,limit,callback)),
+                                            **{"data":"engine={0}&sorting={1}&callback={2}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}), json.dumps({"criteria":[s.refine_formatted() for s in self.sort_criteria]}), callback)})
         except Exception: print "Unable to retrieve rows."
         if response:
             response = json.loads(response.text[19:-1])
@@ -341,7 +359,8 @@ class Project():
             return self.row_set
         else: return None
 
-    def export(self, filename, template, format="template", prefix="{\"rows\":[", suffix="]}", separator=",", *args, **kwargs):
+    def export(self, filename, template, format="template", prefix="{\"rows\":[", suffix="]}",
+               separator=",", *args, **kwargs):
         data = {"project": self.id,
                 "template": kwargs.get("template", template),
                 "format" : kwargs.get("format", format),
@@ -359,15 +378,29 @@ class Project():
         repeat default is false but can be set to true in which case repeat_count should be set to the number of iterations
         """
 
-        try: response = self.server.post("command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id))
-        except http_exceptions.RequestException: print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id)
+        try: response = self.server.post(("command/core/text-transform?columnName={0}&expression={1}&onError={2}"
+                                          "&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression,
+                                                                                           on_error, repeat, repeat_count,
+                                                                                           self.id)))
+        except http_exceptions.RequestException: print("Request command/core/text-transform?columnName={0}"
+                                                       "&expression={1}&onError={2}&repeat={3}&repeatCount={4}"
+                                                       "&project={5}".format(column_name, grel_expression, on_error,
+                                                                             repeat, repeat_count, self.id))
 
     def _get_import_job_status(self, job_id):
         response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
         job_status = None
-        if response and response.json.get("status") == "error": print "Request command/core/get-importing-job-status?jobID={0} returned with error. ".format(job_id) + response.json["job"]["config"]["error"] + response.json["job"]["config"]["errorDetails"] # placeholder - do something because the only response ever is {"status":"error","message":"no such import job"} it means that the job needs to be recreated?
+        if response and response.json.get("status") == "error": print("Request command/core/get-importing-job-status?"
+                                                                      "jobID={0} returned with error.\n{1}\n{2}"
+                                                                      .format(job_id,
+                                                                              response.json["job"]["config"]["error"],
+                                                                              response.json["job"]["config"]["errorDetails"]))
         elif response:
-            if response.json["job"]["config"]["state"] == "error": print "Request command/core/get-importing-job-status?jobID={0} returned with error. ".format(job_id) + response.json["job"]["config"]["error"] + response.json["job"]["config"]["errorDetails"] # headers not correct
+            if response.json["job"]["config"]["state"] == "error": print("Request command/core/get-importing-job-status?"
+                                                                         "jobID={0} returned with error.\n{1}\n{2}"
+                                                                         .format(job_id,
+                                                                                 response.json["job"]["config"]["error"],
+                                                                                 response.json["job"]["config"]["errorDetails"]))
             job_status = ImportJobDetails(**response.json["job"]["config"])
             while job_status.state != "ready" and job_status.state != "created-project":
                 sleep(1)
@@ -388,7 +421,9 @@ class Project():
             format = self.server.configuration.mime_types[mime_type]
         if not format: format = "text/json" # set a default
         try:
-            return self.server.post("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=initialize-parser-ui&format={1}".format(job_id, quote_plus(format)))
+            return self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
+                                    "&jobID={0}&subCommand=initialize-parser-ui&format={1}".format(job_id,
+                                                                                                   quote_plus(format))))
         except Exception:
             print "Failed to initialize-parser-ui."
 
@@ -477,7 +512,11 @@ class Project():
         self.create_options = data_options[refine_mime_type]
         try:
             headers = {'content-type':'application/x-www-form-urlencoded'}
-            return self.server.post("command/core/importing-controller?controller=core/default-importing-controller&jobID={0}&subCommand=update-format-and-options".format(job_id), **{"headers":headers, "data":"format={0}&options={1}".format(quote_plus(refine_mime_type), json.dumps(self.create_options))})
+            return self.server.post(("command/core/importing-controller?controller=core/default-importing-controller"
+                                    "&jobID={0}&subCommand=update-format-and-options".format(job_id)),
+                                    **{"headers":headers,
+                                       "data":"format={0}&options={1}".format(quote_plus(refine_mime_type),
+                                                                              json.dumps(self.create_options))})
         except Exception: print "Error updating format."
 
     def _fetch_models(self, job_id=None):
@@ -495,7 +534,9 @@ class Project():
             headers = {'content-type':'application/x-www-form-urlencoded'}
             self.create_options["projectName"] = name
             data = "format={0}&options={1}".format(quote_plus(mime_type), quote_plus(json.dumps(self.create_options)))
-            response = self.server.post("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=create-project".format(job_id), **{"data":data, "headers":headers})
+            response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
+                                        "&jobID={0}&subCommand=create-project".format(job_id)),
+                                        **{"data":data, "headers":headers})
             # _get_import_job_status returns more information with each successive request involved in the project creation process
             # after create-project it shows the projectID and is the only way of discovering this value given a job id
             job_status = self._get_import_job_status(job_id)
@@ -504,7 +545,8 @@ class Project():
 
     def _create_project_from_file(self, path, job_id, name, **kwargs):
         files = {'file': (basename(path), open(path, 'rb'))}
-        response = self.server.post("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=load-raw-data".format(job_id), **{"files":files})
+        response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
+                                    "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files":files})
         if response and response.json: print "Failed to load data source {0}. ".format(path) + response.json # error message
         job_status = self._get_import_job_status(job_id) # polls for import completion
         mime_type = job_status.rankedFormats[0]
@@ -519,8 +561,9 @@ class Project():
         boundary = choose_boundary()
         data = "--{0}\r\nContent-Disposition: form-data; name=\"download\"\r\n\r\n{1}\r\n--{0}--".format(boundary,url)
         headers = {"content-type":"multipart/form-data; boundary={0}".format(boundary)}
-        response = self.server.post("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=load-raw-data".format(job_id),
-            **{"data":data, "headers":headers})
+        response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
+                                    "&jobID={0}&subCommand=load-raw-data".format(job_id)),
+                                    **{"data":data, "headers":headers})
         if response and response.json:
             print "Failed to load data source {0}. ".format(url) + response.json
         job_status = self._get_import_job_status(job_id) # polls for import completion
@@ -530,35 +573,47 @@ class Project():
 
     def split_multi_value_cell(self, column, key_column, separator):
         try:
-            response = self.server.post("command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}&separator={2}&mode=plain&project={3}".format(column, key_column, separator, self.id))
+            response = self.server.post(("command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}"
+                                        "&separator={2}&mode=plain&project={3}".format(column, key_column,
+                                                                                       separator, self.id)))
         except http_exceptions.RequestException: print "Unable to split cell."
 
     def split_column_by_separator(self, column, separator=",", regex=False, remove_original=True, guess_cell_type=True):
         try:
-            response = self.server.post("command/core/split-column?columnName={0}&mode=separator&project={1}&guessCellType={2}&removeOriginalColumn={3}&separator={4}&regex={5}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(separator), quote_plus(regex) if regex else "false"))
+            response = self.server.post(("command/core/split-column?columnName={0}&mode=separator&project={1}"
+                                        "&guessCellType={2}&removeOriginalColumn={3}&separator={4}"
+                                        "&regex={5}".format(column, self.id, str(guess_cell_type).lower(),
+                                                            str(remove_original).lower(), quote_plus(separator),
+                                                            quote_plus(regex) if regex else "false")))
             self._fetch_models()
         except http_exceptions.RequestException: print "Unable to split column."
 
     def split_column_by_field_length(self, column, lengths, remove_original=True, guess_cell_type=True):
         try:
-            return self.server.post("command/core/split-column?columnName={0}&mode=lengths&project={1}&guessCellType={2}&removeOriginalColumn={3}&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(), str(remove_original).lower(), quote_plus(lengths)))
+            return self.server.post(("command/core/split-column?columnName={0}&mode=lengths&project={1}"
+                                    "&guessCellType={2}&removeOriginalColumn={3}"
+                                    "&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(),
+                                                               str(remove_original).lower(), quote_plus(lengths))))
             self._fetch_models()
         except http_exceptions.RequestException: print "Unable to split column."
 
     def compute_facets(self, mode="row-based"):
         try:
-            response = self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}))})
+            response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
+                                        **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}))})
             return [FacetComputation(**f) for f in response.json["facets"]]
         except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
 
     def test_facets(self, test_facets, mode="row-based"):
         try:
-            response = self.server.post("command/core/compute-facets?project={0}".format(self.id), **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in test_facets],"mode":mode}))})
+            response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
+                                        **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in test_facets],"mode":mode}))})
             return [FacetComputation(**f) for f in response.json["facets"]]
         except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed for test case.".format(self.id)
 
     def roll_to_history_entry(self, history_entry, mode="row-based"):
-        try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id), **{"data":{"engine={0}".format(json.dumps({"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}))}})
+        try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id),
+                                     **{"data":{"engine={0}".format(json.dumps({"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}))}})
         except http_exceptions.RequestException: print "Unable to go to history entry."
 
 
@@ -569,7 +624,8 @@ class HistoryEntry(object):
         self.description = kwargs.get("description",None)
         self.time = kwargs.get("time",None)
         if self.time:
-            self.time = datetime(int(self.time[0:4]), int(self.time[5:7]), int(self.time[8:10]), hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
+            self.time = datetime(int(self.time[0:4]), int(self.time[5:7]), int(self.time[8:10]),
+                                 hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
 
     def __unicode__(self):
         return "{0} {1} [ID:{2}]".format(self.time, self.description, self.id)
@@ -639,7 +695,8 @@ class Facet(object):
 
 class ListFacet(Facet):
 
-    def __init__(self, name, column_name, omit_blank=False, omit_error=False, selection=[], select_blank=True, select_error=True, invert=False, expression="value", *args, **kwargs):
+    def __init__(self, name, column_name, omit_blank=False, omit_error=False, selection=[], select_blank=True,
+                 select_error=True, invert=False, expression="value", *args, **kwargs):
         """
         expression is required
         selection is required
@@ -662,7 +719,8 @@ class ListFacet(Facet):
 
 class RangeFacet(Facet):
 
-    def __init__(self, name, column_name, lower_bound=None, upper_bound=None, select_numeric=True, select_non_numeric=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+    def __init__(self, name, column_name, lower_bound=None, upper_bound=None, select_numeric=True,
+                 select_non_numeric=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
         """
         expression is required
         """
@@ -686,7 +744,8 @@ class RangeFacet(Facet):
 
 class TimeRangeFacet(Facet):
 
-    def __init__(self, name, column_name, lower_bound=None, upper_bound=None, select_time=True, select_non_time=True, select_blank=True, select_error=True, expression="value", *args, **kwargs):
+    def __init__(self, name, column_name, lower_bound=None, upper_bound=None, select_time=True, select_non_time=True,
+                 select_blank=True, select_error=True, expression="value", *args, **kwargs):
         """
         expression is required
         """
