@@ -38,7 +38,8 @@ class RefineConfiguration(object):
 
     def __init__(self, **kwargs):
         if kwargs:
-            self.formats = [RefineFormat(name=k, **kwargs['formats'][k]) for k in kwargs['formats'].keys()]
+            self.formats = [RefineFormat(name=k, **kwargs['formats'][k]) \
+                            for k in kwargs['formats'].keys()]
             self.mime_types = kwargs['mimeTypeToFormat']
             self.file_extensions = kwargs['extensionToFormat']
         else:
@@ -116,14 +117,16 @@ class RefineServer(object):
         response = self.get("command/core/get-all-project-metadata")
         if response.status_code == http_codes.ok:
             return [Project(id = pid) for pid in response.json['projects'].keys()]
-        else: print "Request command/core/get-all-project-metadata failed."
+        else:
+            print "Request command/core/get-all-project-metadata failed."
 
     @property
     def configuration(self):
         response = self.post("command/core/get-importing-configuration")
         if response.status_code == http_codes.ok:
             return RefineConfiguration(**response.json['config'])
-        else: print "Request command/core/get-importing-configuration failed."
+        else:
+            print "Request command/core/get-importing-configuration failed."
 
 
 class DataSource(object):
@@ -264,7 +267,8 @@ class Project():
     def destroy(self):
         if self.id:
             response = self.server.post("command/core/delete-project", **{"data":{"project":self.id}})
-            if response and response.json["code"] != "ok": print "Request command/core/delete-project failed."
+            if response and response.json["code"] != "ok":
+                print "Request command/core/delete-project failed."# placeholder - do something if it fails?
 
     def _fetch_new_job(self):
         response = None
@@ -344,9 +348,8 @@ class Project():
 
     def rows(self, job_id=None, offset=0, limit=-1, mode="row-based"):
         try:
-            if job_id: response = self.server.post(("command/core/get-rows?importingJobID={0}&start={1}"
-                                                    "&limit={2}".format(job_id, offset, limit)),
-                                                   **{"data":{"callback":"jsonp{0}".format(randint(1000000000000,1999999999999))}})
+            if job_id:
+                response = self.server.post("command/core/get-rows?importingJobID={0}&start={1}&limit={2}".format(job_id,offset,limit), **{"data":{"callback":"jsonp{0}".format(randint(1000000000000,1999999999999))}})
             else:
                 callback="jsonp{0}".format(randint(1000000000000,1999999999999))
                 response = self.server.post(("command/core/get-rows?project={0}&start={1}&limit={2}"
@@ -378,14 +381,10 @@ class Project():
         repeat default is false but can be set to true in which case repeat_count should be set to the number of iterations
         """
 
-        try: response = self.server.post(("command/core/text-transform?columnName={0}&expression={1}&onError={2}"
-                                          "&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression,
-                                                                                           on_error, repeat, repeat_count,
-                                                                                           self.id)))
-        except http_exceptions.RequestException: print("Request command/core/text-transform?columnName={0}"
-                                                       "&expression={1}&onError={2}&repeat={3}&repeatCount={4}"
-                                                       "&project={5}".format(column_name, grel_expression, on_error,
-                                                                             repeat, repeat_count, self.id))
+        try:
+            response = self.server.post("command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id))
+        except http_exceptions.RequestException:
+            print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(column_name, grel_expression, on_error, repeat, repeat_count, self.id)
 
     def _get_import_job_status(self, job_id):
         response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
