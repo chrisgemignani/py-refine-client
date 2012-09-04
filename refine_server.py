@@ -429,83 +429,83 @@ class Project():
     def _update_format(self, job_id, refine_mime_type, **kwargs):
         data_options = {
             "text/xml/xlsx":{
-                'storeBlankRows': True,
-                'ignoreLines': -1,
-                'sheetRecords': [],
-                'skipDataLines': 0,
-                'xmlBased': True,
-                'storeBlankCellsAsNulls': True,
-                'includeFileSources': False,
-                'headerLines': 1,
-                'limit': -1
+                'storeBlankRows': kwargs.get("store_blank_rows", True),
+                'ignoreLines': kwargs.get("ignore_lines", -1),
+                'sheetRecords': kwargs.get("sheet_records", []),
+                'skipDataLines': kwargs.get("skip_data_lines", 0),
+                'xmlBased': kwargs.get("xml_based", True),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
+                'includeFileSources': kwargs.get("include_file_sources", False),
+                'headerLines': kwargs.get("header_lines", 1),
+                'limit': kwargs.get("limit", -1)
             },
             "text/xml":{
-                "recordPath": kwargs.get("recordPath",None),
-                "limit":-1,
-                "includeFileSources": False,
+                "recordPath": kwargs.get("recordPath",kwargs.get("record_path", None)),
+                "limit": kwargs.get("limit", -1),
+                "includeFileSources": kwargs.get("include_file_sources", False),
             },
             "text/json":{
-                "recordPath": kwargs.get("recordPath",None),
-                "limit":-1,
-                "includeFileSources": False,
-                "guessCellValueTypes": True
+                "recordPath": kwargs.get("recordPath",kwargs.get("record_path", None)),
+                "limit": kwargs.get("limit", -1),
+                "includeFileSources": kwargs.get("include_file_sources", False),
+                "guessCellValueTypes": kwargs.get("guess_cell_value_types", True)
             },
             "text/line-based":{
                 'encoding': kwargs.get("encoding", ""),
-                'recordPath': kwargs.get("recordPath",None),
-                'linesPerRow':1,
-                'limit':-1,
+                'recordPath': kwargs.get("recordPath",kwargs.get("record_path", None)),
+                'linesPerRow':kwargs.get("lines_per_row", 1),
+                'limit': kwargs.get("limit", -1),
                 'separator': kwargs.get("separator",None),
-                'ignoreLines': -1,
-                'headerLines':0,
-                'skipDataLines': 0,
-                'storeBlankRows': True,
-                'guessCellValueTypes': False,
-                'processQuotes':False,
-                'storeBlankCellsAsNulls': True,
-                'includeFileSources': False
+                'ignoreLines': kwargs.get("ignore_lines", -1),
+                'headerLines': kwargs.get("header_lines", 0),
+                'skipDataLines': kwargs.get("skip_data_lines", 0),
+                'storeBlankRows': kwargs.get("store_blank_rows", True),
+                'guessCellValueTypes': kwargs.get("guess_cell_value_types", False),
+                'processQuotes':kwargs.get("process_quotes", False),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
+                'includeFileSources': kwargs.get("include_file_sources", False)
             },
             "text/line-based/*sv":{
-                'processQuotes': True,
-                'storeBlankRows': True,
-                'ignoreLines': -1,
-                'skipDataLines': 0,
+                'processQuotes': kwargs.get("process_quotes", True),
+                'storeBlankRows': kwargs.get("store_blank_rows", True),
+                'ignoreLines': kwargs.get("ignore_lines", -1),
+                'skipDataLines': kwargs.get("skip_data_lines", 0),
                 'separator': kwargs.get("separator",u'\\t'),
-                'storeBlankCellsAsNulls': True,
-                'guessCellValueTypes': True,
-                'includeFileSources': False,
-                'headerLines': 1,
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
+                'guessCellValueTypes': kwargs.get("guess_cell_value_types", True),
+                'includeFileSources': kwargs.get("include_file_sources", False),
+                'headerLines': kwargs.get("header_lines", 1),
             },
             "text/xml/rdf":{
-                'includeFileSources': False,
+                'includeFileSources': kwargs.get("include_file_sources", False),
                 'encoding': kwargs.get("encoding", "")
             },
             "text/line-based/fixed-width":{
-                'storeBlankRows': True,
-                'ignoreLines': -1,
-                'skipDataLines': 0,
-                'storeBlankCellsAsNulls': True,
-                'includeFileSources': False,
-                'headerLines': 1,
+                'storeBlankRows': kwargs.get("store_blank_rows", True),
+                'ignoreLines': kwargs.get("ignore_lines", -1),
+                'skipDataLines': kwargs.get("skip_data_lines", 0),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
+                'includeFileSources': kwargs.get("include_file_sources", False),
+                'headerLines': kwargs.get("header_lines", 1),
                 'encoding' : kwargs.get("encoding", ""),
                 'columnWidths': kwargs.get("columnWidths",None),
                 'columnNames': kwargs.get("columnNames", None),
-                'limit':-1,
-                'guessCellValueTypes': False
+                'limit': kwargs.get("limit", -1),
+                'guessCellValueTypes': kwargs.get("guess_cell_value_types", False)
             },
             "text/line-based/pc-axis":{
-                'skipDataLines': 0,
-                'limit': -1,
-                'includeFileSources': False
+                'skipDataLines': kwargs.get("skip_data_lines", 0),
+                'limit': kwargs.get("limit", -1),
+                'includeFileSources': kwargs.get("include_file_sources", False)
             },
             "text/xml/ods":{
-                'storeBlankRows': True,
-                'ignoreLines': -1,
-                'sheetRecords': [],
-                'skipDataLines': 0,
-                'storeBlankCellsAsNulls': True,
-                'includeFileSources': False,
-                'headerLines': 1
+                'storeBlankRows': kwargs.get("store_blank_rows", True),
+                'ignoreLines': kwargs.get("ignore_lines", -1),
+                'sheetRecords': kwargs.get("sheet_records", []),
+                'skipDataLines': kwargs.get("skip_data_lines", 0),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
+                'includeFileSources': kwargs.get("include_file_sources", False),
+                'headerLines': kwargs.get("header_lines", 1)
             }
         }
         self.create_options = data_options[refine_mime_type]
