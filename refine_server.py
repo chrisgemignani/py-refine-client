@@ -89,21 +89,19 @@ class RefineServer(object):
         return self.__unicode__()
 
     def get(self, action):
+        if DEBUG: print "REQUEST URL : {0}".format(str(action))
         try: return http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
         except http_exceptions.RequestException:
             raise
 
     def post(self, action, data=None, headers=None, files=None, **kwargs):
+        if DEBUG: print "REQUEST URL : {0}\nDATA : {1}\nHEADERS : {2}".format(str(action), str(data), str(headers))
         try:
             new_kwargs = {"data":kwargs.get("data",data),
                           "files":kwargs.get("files",files),
                           "headers":kwargs.get("headers",headers)}
             response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), **new_kwargs)
-            if DEBUG: print(("REQUEST URL : {0}\nDATA : {1}"
-                             "\nHEADERS : {2}\nRESPONSE : {3}").format(str(response.request.url),
-                                                                        str(response.request.data),
-                                                                        str(response.request.headers),
-                                                                        response.text))
+            if DEBUG: print(("RESPONSE : {0}").format(response.text))
             return response
         except http_exceptions.RequestException: print "Request {0} failed.".format(action)
 
@@ -389,17 +387,17 @@ class Project():
     def _get_import_job_status(self, job_id):
         response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
         job_status = None
-        if response and response.json.get("status") == "error": print("Request command/core/get-importing-job-status?"
-                                                                      "jobID={0} returned with error.\n{1}\n{2}"
-                                                                      .format(job_id,
-                                                                              response.json["job"]["config"]["error"],
-                                                                              response.json["job"]["config"]["errorDetails"]))
+        if response and response.json.get("status") == "error":
+            print("Request command/core/get-importing-job-status?"
+                  "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
+                                                                    response.json["job"]["config"]["error"],
+                                                                    response.json["job"]["config"]["errorDetails"]))
         elif response:
-            if response.json["job"]["config"]["state"] == "error": print("Request command/core/get-importing-job-status?"
-                                                                         "jobID={0} returned with error.\n{1}\n{2}"
-                                                                         .format(job_id,
-                                                                                 response.json["job"]["config"]["error"],
-                                                                                 response.json["job"]["config"]["errorDetails"]))
+            if response.json["job"]["config"]["state"] == "error":
+                print("Request command/core/get-importing-job-status?"
+                      "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
+                                                                        response.json["job"]["config"]["error"],
+                                                                        response.json["job"]["config"]["errorDetails"]))
             job_status = ImportJobDetails(**response.json["job"]["config"])
             while job_status.state != "ready" and job_status.state != "created-project":
                 sleep(1)
@@ -428,6 +426,17 @@ class Project():
 
     def _update_format(self, job_id, refine_mime_type, **kwargs):
         data_options = {
+            "binary/xls":{
+                "xmlBased": kwargs.get("xml_based", False),
+                "sheets": kwargs.get("sheets", [0]),
+                "ignoreLines": kwargs.get("ignore_lines", -1),
+                "headerLines": kwargs.get("header_lines", 1),
+                "skipDataLines": kwargs.get("skip_data_lines", 0),
+                "limit": kwargs.get("limit", -1),
+                "storeBlankRows": kwargs.get("store_blank_rows", False),
+                "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", True),
+                "includeFileSources": kwargs.get("include_file_sources", False)
+            },
             "text/xml/xlsx":{
                 'storeBlankRows': kwargs.get("store_blank_rows", True),
                 'ignoreLines': kwargs.get("ignore_lines", -1),
