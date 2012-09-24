@@ -508,6 +508,8 @@ class Project():
                 'includeFileSources': kwargs.get("include_file_sources", False)
             },
             "text/xml/ods":{
+                'sheets': kwargs.get("sheets", [0]),
+                'limit': kwargs.get("limit", -1),
                 'storeBlankRows': kwargs.get("store_blank_rows", True),
                 'ignoreLines': kwargs.get("ignore_lines", -1),
                 'sheetRecords': kwargs.get("sheet_records", []),
