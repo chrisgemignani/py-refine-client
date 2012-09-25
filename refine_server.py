@@ -559,7 +559,8 @@ class Project():
                                     "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files":files})
         if response and response.json: print "Failed to load data source {0}. ".format(path) + response.json # error message
         job_status = self._get_import_job_status(job_id) # polls for import completion
-        mime_type = job_status.rankedFormats[0]
+        if DEBUG: print job_status
+        mime_type = job_status.ranked_formats[0]
         update_response = self._update_format(job_id, mime_type, **kwargs)
         self._fetch_models(job_id)
         self._create(job_id, mime_type, name, **kwargs)
