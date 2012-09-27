@@ -105,6 +105,10 @@ class RefineServer(object):
             return response
         except http_exceptions.RequestException: print "Request {0} failed.".format(action)
 
+    def destroy_all_projects(self):
+        for p in self.projects:
+            p.destroy()
+
     @property
     def version(self):
         response = self.get("command/core/get-version")
