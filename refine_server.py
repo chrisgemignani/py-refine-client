@@ -107,6 +107,7 @@ class RefineServer(object):
 
     def destroy_all_projects(self):
         for p in self.projects:
+            if DEBUG: print "Destroying {0}".format(p.id)
             p.destroy()
 
     @property
