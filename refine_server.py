@@ -298,14 +298,11 @@ class Project():
     def name(self):
         return self._name
 
-    @name.setter
-    def name(self, name):
+    def rename_column(self, old_name, new_name):
         try: response = self.server.post(("/command/core/rename-column?oldColumnName={0}"
-                                          "&newColumnName={1}&project={2}".format(self._name, name, self.id)))
+                                          "&newColumnName={1}&project={2}".format(old_name, new_name, self.id)))
         except http_exceptions.RequestException: print("Request /command/core/rename-column?oldColumnName={0}"
-                                                       "&newColumnName={1}&project={2}".format(self._name, name, self.id))
-        if response and response.json.get("code",None) == "ok":
-            self._name = name
+                                                       "&newColumnName={1}&project={2}".format(old_name, new_name, self.id))
 
     @property
     def sort_criteria(self):
@@ -606,12 +603,13 @@ class Project():
 
     def split_column_by_field_length(self, column, lengths, remove_original=True, guess_cell_type=True):
         try:
-            return self.server.post(("command/core/split-column?columnName={0}&mode=lengths&project={1}"
+            response = self.server.post(("command/core/split-column?columnName={0}&mode=lengths&project={1}"
                                     "&guessCellType={2}&removeOriginalColumn={3}"
                                     "&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(),
                                                                str(remove_original).lower(), quote_plus(lengths))))
             self._fetch_models()
         except http_exceptions.RequestException: print "Unable to split column."
+        return response
 
     def compute_facets(self, mode="row-based"):
         try:
