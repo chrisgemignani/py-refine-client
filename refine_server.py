@@ -678,7 +678,7 @@ class SortCriterion(object):
         key_formatted_repr = {}
         for k in self.__dict__.keys():
             new_key = "".join([c.capitalize() for c in k.split("_")])
-            key_formatted_repr[new_key[0].lower()+new_key[1:]] = self.__dict__[k]
+            key_formatted_repr[new_key[0].lower()+new_key[1:]] = getattr(self, k)
         return key_formatted_repr
 
 
@@ -688,7 +688,7 @@ class Facet(object):
         self.type = kwargs.get("type", type)
         self.name = kwargs.get("name", name)
         self.column_name = kwargs.get("column_name", column_name)
-        for k in kwargs.keys(): self.__dict__[k] = kwargs.get(k, None)
+        for k in kwargs.keys(): setattr(self, k, kwargs.get(k, None))
 
     def __unicode__(self):
         return "{0} facet on {1}".format(self.type, self.column_name)
@@ -699,11 +699,11 @@ class Facet(object):
     def refine_formatted(self):
         key_formatted_repr = {}
         for k in self.__dict__.keys():
-            if k == "lower_bound": key_formatted_repr["from"] = self.__dict__[k]
-            elif k == "upper_bound": key_formatted_repr["to"] = self.__dict__[k]
+            if k == "lower_bound": key_formatted_repr["from"] = getattr(self, k)
+            elif k == "upper_bound": key_formatted_repr["to"] = getattr(self, k)
             else:
                 new_key = "".join([c.capitalize() for c in k.split("_")])
-                key_formatted_repr[new_key[0].lower()+new_key[1:]] = self.__dict__[k]
+                key_formatted_repr[new_key[0].lower()+new_key[1:]] = getattr(self, k)
         return key_formatted_repr
 
 
@@ -827,10 +827,10 @@ class FacetComputation(object):
                         s: a Boolean indicating whether this value is selected as part of this facet (allowing for multi-select)
 
         """
-        for k in kwargs.keys(): self.__dict__[k] = kwargs.get(k, None)
+        for k in kwargs.keys(): setattr(self, k, kwargs.get(k, None))
 
     def __unicode__(self):
-        return "\n".join(["{0}: {1}".format(k, self.__dict__[k]) for k in self.__dict__.keys()])
+        return "\n".join(["{0}: {1}".format(k, getattr(self, k)) for k in self.__dict__.keys()])
 
     def __str__(self):
         return self.__unicode__()
