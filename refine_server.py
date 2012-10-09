@@ -38,7 +38,7 @@ class RefineConfiguration(object):
 
     def __init__(self, **kwargs):
         if kwargs:
-            self.formats = [RefineFormat(name=k, **kwargs['formats'][k]) \
+            self.formats = [RefineFormat(name=k, **kwargs['formats'][k])\
                             for k in kwargs['formats'].keys()]
             self.mime_types = kwargs['mimeTypeToFormat']
             self.file_extensions = kwargs['extensionToFormat']
@@ -89,25 +89,30 @@ class RefineServer(object):
         return self.__unicode__()
 
     def get(self, action):
-        if DEBUG: print "REQUEST URL : {0}".format(str(action))
-        try: return http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
+        if DEBUG:
+            print "REQUEST URL : {0}".format(str(action))
+        try:
+            return http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
         except http_exceptions.RequestException:
             raise
 
     def post(self, action, data=None, headers=None, files=None, **kwargs):
-        if DEBUG: print "REQUEST URL : {0}\nDATA : {1}\nHEADERS : {2}".format(str(action), str(data), str(headers))
+        if DEBUG:
+            print "REQUEST URL : {0}\nDATA : {1}\nHEADERS : {2}".format(str(action), str(data), str(headers))
         try:
             new_kwargs = {"data":kwargs.get("data",data),
                           "files":kwargs.get("files",files),
                           "headers":kwargs.get("headers",headers)}
             response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), **new_kwargs)
-            if DEBUG: print(("RESPONSE : {0}").format(response.text))
+            if DEBUG:
+                print(("RESPONSE : {0}").format(response.text[:500]))
             return response
         except http_exceptions.RequestException: print "Request {0} failed.".format(action)
 
     def destroy_all_projects(self):
         for p in self.projects:
-            if DEBUG: print "Destroying {0}".format(p.id)
+            if DEBUG:
+                print "Destroying {0}".format(p.id)
             p.destroy()
 
     @property
@@ -169,7 +174,7 @@ class RetrievalRecord():
     def __unicode__(self):
         return ("{0} downloads, {1} archives, "
                 "{2} clipboards, {3} uploads\n{4}").format(self.download_count, self.archive_count,
-                                                           self.clipboard_count, self.upload_count, str(self.files))
+            self.clipboard_count, self.upload_count, str(self.files))
 
     def __str__(self):
         return self.__unicode__()
@@ -191,7 +196,7 @@ class ImportJobDetails():
     def __unicode__(self):
         return ("Job is {0} and {1}"
                 "\nFormats (most likely first):\n{2}").format(self.state, "has data" if self.has_data else "has no data",
-                                                              str(self.ranked_formats))
+            str(self.ranked_formats))
 
     def __str__(self):
         return self.__unicode__()
@@ -222,8 +227,8 @@ class RowSet():
 
     def __unicode__(self):
         return ("{0} rows starting at {1} of {2} "
-               "total rows ({3} filtered rows)\nSample Row:\n".format(self.limit, self.offset, self.total_count,
-                                                                      self.filtered_count, str(self.rows[0])))
+                "total rows ({3} filtered rows)\nSample Row:\n".format(self.limit, self.offset, self.total_count,
+            self.filtered_count, str(self.rows[0])))
 
     def __str__(self):
         return self.__unicode__()
@@ -354,7 +359,7 @@ class Project():
                 callback="jsonp{0}".format(randint(1000000000000,1999999999999))
                 response = self.server.post(("command/core/get-rows?project={0}&start={1}&limit={2}"
                                              "&callback={3}".format(self.id,offset,limit,callback)),
-                                            **{"data":"engine={0}&sorting={1}&callback={2}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}), json.dumps({"criteria":[s.refine_formatted() for s in self.sort_criteria]}), callback)})
+                    **{"data":"engine={0}&sorting={1}&callback={2}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}), json.dumps({"criteria":[s.refine_formatted() for s in self.sort_criteria]}), callback)})
         except Exception: print "Unable to retrieve rows."
         if response:
             response = json.loads(response.text[19:-1])
@@ -363,12 +368,14 @@ class Project():
         else: return None
 
     def export(self, filename, template, format="template", prefix="{\"rows\":[", suffix="]}",
-               separator=",", *args, **kwargs):
-        data = {"project": self.id,
+               separator=",", sorting=[], facets=[], mode="row-based", *args, **kwargs):
+        data = {"project" : self.id,
+                "engine" : json.dumps({"facets":[f.refine_formatted() for f in kwargs.get("facets", facets)], "mode" : kwargs.get("mode", mode)}),
                 "template": kwargs.get("template", template),
                 "format" : kwargs.get("format", format),
                 "prefix" : kwargs.get("prefix", prefix),
                 "suffix" : kwargs.get("suffix", suffix),
+                "sorting" : json.dumps({"criteria":[s.refine_formatted() for s in kwargs.get("sorting", sorting)]}),
                 "separator" : kwargs.get("separator", separator)}
         try:
             response = self.server.post("command/core/export-rows/{0}".format(filename), **{"data":data})
@@ -392,14 +399,14 @@ class Project():
         if response and response.json.get("status") == "error":
             print("Request command/core/get-importing-job-status?"
                   "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
-                                                                    response.json["job"]["config"]["error"],
-                                                                    response.json["job"]["config"]["errorDetails"]))
+                response.json["job"]["config"]["error"],
+                response.json["job"]["config"]["errorDetails"]))
         elif response:
             if response.json["job"]["config"]["state"] == "error":
                 print("Request command/core/get-importing-job-status?"
                       "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
-                                                                        response.json["job"]["config"]["error"],
-                                                                        response.json["job"]["config"]["errorDetails"]))
+                    response.json["job"]["config"]["error"],
+                    response.json["job"]["config"]["errorDetails"]))
             job_status = ImportJobDetails(**response.json["job"]["config"])
             while job_status.state != "ready" and job_status.state != "created-project":
                 sleep(1)
@@ -411,124 +418,134 @@ class Project():
                     break
             if job_status.state == "created-project":
                 self.id = response.json["job"]["config"]["projectID"]
-        else: raise Exception # odd scenario
+        else:
+            print "No response to get-importing-job-status"
+            raise Exception # odd scenario
         return job_status
 
     def _initialize_parser(self, job_id, mime_type="application/json"):
         format = mime_type
+        if DEBUG:
+            print "Initialize parser received : {0}".format(mime_type)
         if mime_type not in [f.name for f in self.server.configuration.formats]:
             format = self.server.configuration.mime_types[mime_type]
         if not format: format = "text/json" # set a default
+        if DEBUG:
+            print "Initializing parser to {0}".format
         try:
-            return self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
-                                    "&jobID={0}&subCommand=initialize-parser-ui&format={1}".format(job_id,
-                                                                                                   quote_plus(format))))
+            response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
+                                         "&jobID={0}&subCommand=initialize-parser-ui&format={1}".format(job_id,
+                quote_plus(format))))
+            if DEBUG:
+                print "Initialize parser : {0}".format(response.text)
+            return response.json["options"]
         except Exception:
             print "Failed to initialize-parser-ui."
+            return dict()
 
     def _update_format(self, job_id, refine_mime_type, **kwargs):
         data_options = {
             "binary/xls":{
-                "xmlBased": kwargs.get("xml_based", False),
+                "xmlBased": kwargs.get("xml_based", kwargs.get("xmlBased", False)),
                 "sheets": kwargs.get("sheets", [0]),
-                "ignoreLines": kwargs.get("ignore_lines", -1),
-                "headerLines": kwargs.get("header_lines", 1),
-                "skipDataLines": kwargs.get("skip_data_lines", 0),
+                "ignoreLines": kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+                "headerLines": kwargs.get("header_lines", kwargs.get("headerLines", 1)),
+                "skipDataLines": kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
                 "limit": kwargs.get("limit", -1),
-                "storeBlankRows": kwargs.get("store_blank_rows", False),
-                "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", True),
-                "includeFileSources": kwargs.get("include_file_sources", False)
+                "storeBlankRows": kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
+                "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+                "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
             },
             "text/xml/xlsx":{
-                'storeBlankRows': kwargs.get("store_blank_rows", True),
-                'ignoreLines': kwargs.get("ignore_lines", -1),
-                'sheetRecords': kwargs.get("sheet_records", []),
-                'skipDataLines': kwargs.get("skip_data_lines", 0),
-                'xmlBased': kwargs.get("xml_based", True),
-                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
-                'includeFileSources': kwargs.get("include_file_sources", False),
-                'headerLines': kwargs.get("header_lines", 1),
+                'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+                'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+                "sheets": kwargs.get("sheets", [0]),
+                'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+                'xmlBased': kwargs.get("xml_based", kwargs.get("xmlBased", True)),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+                'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+                'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
                 'limit': kwargs.get("limit", -1)
             },
             "text/xml":{
                 "recordPath": kwargs.get("recordPath",kwargs.get("record_path", None)),
                 "limit": kwargs.get("limit", -1),
-                "includeFileSources": kwargs.get("include_file_sources", False),
-            },
+                "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+                },
             "text/json":{
                 "recordPath": kwargs.get("recordPath",kwargs.get("record_path", None)),
                 "limit": kwargs.get("limit", -1),
-                "includeFileSources": kwargs.get("include_file_sources", False),
-                "guessCellValueTypes": kwargs.get("guess_cell_value_types", True)
+                "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+                "guessCellValueTypes": kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", True))
             },
             "text/line-based":{
                 'encoding': kwargs.get("encoding", ""),
                 'recordPath': kwargs.get("recordPath",kwargs.get("record_path", None)),
-                'linesPerRow':kwargs.get("lines_per_row", 1),
+                'linesPerRow':kwargs.get("lines_per_row", kwargs.get("linesPerRow", 1)),
                 'limit': kwargs.get("limit", -1),
                 'separator': kwargs.get("separator",None),
-                'ignoreLines': kwargs.get("ignore_lines", -1),
-                'headerLines': kwargs.get("header_lines", 0),
-                'skipDataLines': kwargs.get("skip_data_lines", 0),
-                'storeBlankRows': kwargs.get("store_blank_rows", True),
-                'guessCellValueTypes': kwargs.get("guess_cell_value_types", False),
-                'processQuotes':kwargs.get("process_quotes", False),
-                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
-                'includeFileSources': kwargs.get("include_file_sources", False)
+                'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+                'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 0)),
+                'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+                'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+                'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False)),
+                'processQuotes':kwargs.get("process_quotes", kwargs.get("processQuotes", False)),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+                'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
             },
             "text/line-based/*sv":{
-                'processQuotes': kwargs.get("process_quotes", True),
-                'storeBlankRows': kwargs.get("store_blank_rows", True),
-                'ignoreLines': kwargs.get("ignore_lines", -1),
-                'skipDataLines': kwargs.get("skip_data_lines", 0),
+                'processQuotes': kwargs.get("process_quotes", kwargs.get("processQuotes", True)),
+                'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+                'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+                'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
                 'separator': kwargs.get("separator",u'\\t'),
-                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
-                'guessCellValueTypes': kwargs.get("guess_cell_value_types", True),
-                'includeFileSources': kwargs.get("include_file_sources", False),
-                'headerLines': kwargs.get("header_lines", 1),
-            },
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+                'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", True)),
+                'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+                'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
+                },
             "text/xml/rdf":{
-                'includeFileSources': kwargs.get("include_file_sources", False),
+                'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
                 'encoding': kwargs.get("encoding", "")
             },
             "text/line-based/fixed-width":{
-                'storeBlankRows': kwargs.get("store_blank_rows", True),
-                'ignoreLines': kwargs.get("ignore_lines", -1),
-                'skipDataLines': kwargs.get("skip_data_lines", 0),
-                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
-                'includeFileSources': kwargs.get("include_file_sources", False),
-                'headerLines': kwargs.get("header_lines", 1),
+                'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+                'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+                'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+                'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+                'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
                 'encoding' : kwargs.get("encoding", ""),
-                'columnWidths': kwargs.get("columnWidths",None),
-                'columnNames': kwargs.get("columnNames", None),
+                'columnWidths': kwargs.get("column_widths", kwargs.get("columnWidths", None)),
+                'columnNames': kwargs.get("column_names", kwargs.get("columnNames", None)),
                 'limit': kwargs.get("limit", -1),
-                'guessCellValueTypes': kwargs.get("guess_cell_value_types", False)
+                'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False))
             },
             "text/line-based/pc-axis":{
-                'skipDataLines': kwargs.get("skip_data_lines", 0),
+                'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
                 'limit': kwargs.get("limit", -1),
-                'includeFileSources': kwargs.get("include_file_sources", False)
+                'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
             },
             "text/xml/ods":{
                 'sheets': kwargs.get("sheets", [0]),
                 'limit': kwargs.get("limit", -1),
-                'storeBlankRows': kwargs.get("store_blank_rows", True),
-                'ignoreLines': kwargs.get("ignore_lines", -1),
-                'sheetRecords': kwargs.get("sheet_records", []),
-                'skipDataLines': kwargs.get("skip_data_lines", 0),
-                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", True),
-                'includeFileSources': kwargs.get("include_file_sources", False),
-                'headerLines': kwargs.get("header_lines", 1)
+                'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+                'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+                'sheetRecords': kwargs.get("sheet_records", kwargs.get("sheetRecords", [])),
+                'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+                'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+                'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+                'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1))
             }
         }
         self.create_options = data_options[refine_mime_type]
         try:
             headers = {'content-type':'application/x-www-form-urlencoded'}
             return self.server.post(("command/core/importing-controller?controller=core/default-importing-controller"
-                                    "&jobID={0}&subCommand=update-format-and-options".format(job_id)),
-                                    **{"headers":headers,
-                                       "data":"format={0}&options={1}".format(quote_plus(refine_mime_type),
-                                                                              json.dumps(self.create_options))})
+                                     "&jobID={0}&subCommand=update-format-and-options".format(job_id)),
+                **{"headers":headers,
+                   "data":"format={0}&options={1}".format(quote_plus(refine_mime_type),
+                       json.dumps(self.create_options))})
         except Exception: print "Error updating format."
 
     def _fetch_models(self, job_id=None):
@@ -547,8 +564,8 @@ class Project():
             self.create_options["projectName"] = name
             data = "format={0}&options={1}".format(quote_plus(mime_type), quote_plus(json.dumps(self.create_options)))
             response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
-                                        "&jobID={0}&subCommand=create-project".format(job_id)),
-                                        **{"data":data, "headers":headers})
+                                         "&jobID={0}&subCommand=create-project".format(job_id)),
+                **{"data":data, "headers":headers})
             # _get_import_job_status returns more information with each successive request involved in the project creation process
             # after create-project it shows the projectID and is the only way of discovering this value given a job id
             job_status = self._get_import_job_status(job_id)
@@ -558,55 +575,81 @@ class Project():
     def _create_project_from_file(self, path, job_id, name, **kwargs):
         files = {'file': (basename(path), open(path, 'rb'))}
         response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
-                                    "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files":files})
-        if response and response.json: print "Failed to load data source {0}. ".format(path) + response.json # error message
+                                     "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files":files})
+        if response and response.json:
+            print "Failed to load data source {0}. ".format(path) + response.json # error message
         job_status = self._get_import_job_status(job_id) # polls for import completion
-        if DEBUG: print job_status
+        if DEBUG:
+            print job_status
         mime_type = job_status.ranked_formats[0]
-        update_response = self._update_format(job_id, mime_type, **kwargs)
+        presets = self._initialize_parser(job_id, mime_type)
+        for key in presets:
+            if key in kwargs:
+                if DEBUG:
+                    print "Cloberring {0} with {1}".format(key, kwargs[key])
+                presets[key] = kwargs[key]
+        update_response = self._update_format(job_id, mime_type, **presets)
+        if DEBUG:
+            print "Presets : {0}".format(presets)
         self._fetch_models(job_id)
         self._create(job_id, mime_type, name, **kwargs)
 
     def _create_project_from_url(self, url, job_id, name, **kwargs):
         mime_type = http_get(url).headers["content-type"]
-        if mime_type.find(";") > 0: mime_type = mime_type[0:mime_type.find(";")]
-        mime_type = self.server.configuration.mime_types[mime_type]
+        if mime_type.find(";") > 0:
+            mime_type = mime_type[0:mime_type.find(";")]
+        if DEBUG:
+            print "Provided MIME type : {0}".format(mime_type)
+        try:
+            mime_type = self.server.configuration.mime_types[mime_type]
+        except Exception:
+            if mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                mime_type = "text/xml/xlsx"
         boundary = choose_boundary()
         data = "--{0}\r\nContent-Disposition: form-data; name=\"download\"\r\n\r\n{1}\r\n--{0}--".format(boundary,url)
         headers = {"content-type":"multipart/form-data; boundary={0}".format(boundary)}
         response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
-                                    "&jobID={0}&subCommand=load-raw-data".format(job_id)),
-                                    **{"data":data, "headers":headers})
+                                     "&jobID={0}&subCommand=load-raw-data".format(job_id)),
+            **{"data":data, "headers":headers})
         if response and response.json:
             print "Failed to load data source {0}. ".format(url) + response.json
         job_status = self._get_import_job_status(job_id) # polls for import completion
-        update_response = self._update_format(job_id, mime_type, **kwargs)
+        if mime_type:
+            presets = self._initialize_parser(job_id, mime_type)
+        for key in presets:
+            if key in kwargs:
+                if DEBUG:
+                    print "Cloberring {0} with {1}".format(key, kwargs[key])
+                presets[key] = kwargs[key]
+        update_response = self._update_format(job_id, mime_type, **presets)
+        if DEBUG:
+            print "Presets : {0}".format(presets)
         self._fetch_models(job_id)
         self._create(job_id, mime_type, name, **kwargs)
 
     def split_multi_value_cell(self, column, key_column, separator):
         try:
             response = self.server.post(("command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}"
-                                        "&separator={2}&mode=plain&project={3}".format(column, key_column,
-                                                                                       separator, self.id)))
+                                         "&separator={2}&mode=plain&project={3}".format(column, key_column,
+                separator, self.id)))
         except http_exceptions.RequestException: print "Unable to split cell."
 
     def split_column_by_separator(self, column, separator=",", regex=False, remove_original=True, guess_cell_type=True):
         try:
             response = self.server.post(("command/core/split-column?columnName={0}&mode=separator&project={1}"
-                                        "&guessCellType={2}&removeOriginalColumn={3}&separator={4}"
-                                        "&regex={5}".format(column, self.id, str(guess_cell_type).lower(),
-                                                            str(remove_original).lower(), quote_plus(separator),
-                                                            quote_plus(regex) if regex else "false")))
+                                         "&guessCellType={2}&removeOriginalColumn={3}&separator={4}"
+                                         "&regex={5}".format(column, self.id, str(guess_cell_type).lower(),
+                str(remove_original).lower(), quote_plus(separator),
+                quote_plus(regex) if regex else "false")))
             self._fetch_models()
         except http_exceptions.RequestException: print "Unable to split column."
 
     def split_column_by_field_length(self, column, lengths, remove_original=True, guess_cell_type=True):
         try:
             response = self.server.post(("command/core/split-column?columnName={0}&mode=lengths&project={1}"
-                                    "&guessCellType={2}&removeOriginalColumn={3}"
-                                    "&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(),
-                                                               str(remove_original).lower(), quote_plus(lengths))))
+                                         "&guessCellType={2}&removeOriginalColumn={3}"
+                                         "&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(),
+                str(remove_original).lower(), quote_plus(lengths))))
             self._fetch_models()
         except http_exceptions.RequestException: print "Unable to split column."
         return response
@@ -614,20 +657,20 @@ class Project():
     def compute_facets(self, mode="row-based"):
         try:
             response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
-                                        **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}))})
+                **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in self.facets],"mode":mode}))})
             return [FacetComputation(**f) for f in response.json["facets"]]
         except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(self.id)
 
     def test_facets(self, test_facets, mode="row-based"):
         try:
             response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
-                                        **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in test_facets],"mode":mode}))})
+                **{"data":"engine={0}".format(json.dumps({"facets":[f.refine_formatted() for f in test_facets],"mode":mode}))})
             return [FacetComputation(**f) for f in response.json["facets"]]
         except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed for test case.".format(self.id)
 
     def roll_to_history_entry(self, history_entry, mode="row-based"):
         try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id),
-                                     **{"data":{"engine={0}".format(json.dumps({"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}))}})
+            **{"data":{"engine={0}".format(json.dumps({"mode":mode, "facets":[f.refine_formatted() for f in self.facets]}))}})
         except http_exceptions.RequestException: print "Unable to go to history entry."
 
 
@@ -639,7 +682,7 @@ class HistoryEntry(object):
         self.time = kwargs.get("time",None)
         if self.time:
             self.time = datetime(int(self.time[0:4]), int(self.time[5:7]), int(self.time[8:10]),
-                                 hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
+                hour=int(self.time[11:13]), minute=int(self.time[14:16]), second=int(self.time[17:19]))
 
     def __unicode__(self):
         return "{0} {1} [ID:{2}]".format(self.time, self.description, self.id)
@@ -667,9 +710,9 @@ class SortCriterion(object):
 
     def __unicode__(self):
         return "Sort by {0} ({1}) {2}, with blank rows {3} and error rows {4}".format(self.column_name, self.column_type,
-                "descending" if self.reverse else "ascending",
-                "first" if self.blank_position == 0 else "last" if self.blank_position == 2 else "second",
-                "first" if self.error_position == 0 else "last" if self.error_position == 2 else "second")
+            "descending" if self.reverse else "ascending",
+            "first" if self.blank_position == 0 else "last" if self.blank_position == 2 else "second",
+            "first" if self.error_position == 0 else "last" if self.error_position == 2 else "second")
 
     def __str__(self):
         return self.__unicode__()
