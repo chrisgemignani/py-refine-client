@@ -104,8 +104,11 @@ class RefineServer(object):
                           "files":kwargs.get("files",files),
                           "headers":kwargs.get("headers",headers)}
             response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), **new_kwargs)
-            if DEBUG:
-                print(("RESPONSE : {0}").format(response.text[:500]))
+            if DEBUG and action.find("get-rows")==-1:
+                try:
+                  print(("RESPONSE : {0}").format(response.text))
+                except Exception as e:
+                  print e
             return response
         except http_exceptions.RequestException: print "Request {0} failed.".format(action)
 
