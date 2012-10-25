@@ -604,6 +604,8 @@ class Project():
 			kwargs["recordPath"] = Project.identify_json_record_path(None, path)
 		elif mime_type=="text/line-based/*sv" and not kwargs.has_key("separator"):
 			kwargs["separator"]=Project.sv_separator(None, path)
+			if DEBUG:
+				print "Selected *sv separator {0}".format(kwargs["separator"])
 
 		presets = self._initialize_parser(job_id, mime_type)
 		presets.update(kwargs)
@@ -629,6 +631,8 @@ class Project():
 			kwargs["recordPath"] = Project.identify_json_record_path(url)
 		elif mime_type=="text/line-based/*sv" and not kwargs.has_key("separator"):
 			kwargs["separator"]=Project.sv_separator(url)
+			if DEBUG:
+				print "Selected *sv separator {0}".format(kwargs["separator"])
 		boundary = choose_boundary()
 		data = "--{0}\r\nContent-Disposition: form-data; name=\"download\"\r\n\r\n{1}\r\n--{0}--".format(boundary, url)
 		headers = {"content-type": "multipart/form-data; boundary={0}".format(boundary)}
@@ -654,6 +658,8 @@ class Project():
 
 		elif path:
 			content = file.open(path,'r').readlines(1000)
+
+		print "CHECKING CSV : {0}".format(content)
 
 		if match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|,)+$", content):
 			return ","
