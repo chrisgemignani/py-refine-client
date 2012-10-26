@@ -415,9 +415,9 @@ class Project():
     if response:
       if response.json.get("status") == "error":
         print("Request command/core/get-importing-job-status?"
-            "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
-                                                              response.json["job"]["config"]["error"],
-                                                              response.json["job"]["config"]["errorDetails"]))
+              "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
+                                                                response.json["job"]["config"]["error"],
+                                                                response.json["job"]["config"]["errorDetails"]))
       else:
         if response.json["job"]["config"]["state"] == "error":
           print("Request command/core/get-importing-job-status?"
@@ -483,7 +483,7 @@ class Project():
         "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
       },
       "text/xml/xlsx": {
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
         'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
         "sheets": kwargs.get("sheets", [0]),
         'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
@@ -513,7 +513,7 @@ class Project():
         'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
         'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 0)),
         'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
         'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False)),
         'processQuotes': kwargs.get("process_quotes", kwargs.get("processQuotes", False)),
         'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
@@ -521,7 +521,7 @@ class Project():
       },
       "text/line-based/*sv": {
         'processQuotes': kwargs.get("process_quotes", kwargs.get("processQuotes", True)),
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
         'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
         'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
         'separator': kwargs.get("separator", u'\\t'),
@@ -535,7 +535,7 @@ class Project():
         'encoding': kwargs.get("encoding", "")
       },
       "text/line-based/fixed-width": {
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
         'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
         'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
         'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
@@ -555,7 +555,7 @@ class Project():
       "text/xml/ods": {
         'sheets': kwargs.get("sheets", [0]),
         'limit': kwargs.get("limit", -1),
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", True)),
+        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
         'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
         'sheetRecords': kwargs.get("sheet_records", kwargs.get("sheetRecords", [])),
         'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
