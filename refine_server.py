@@ -881,6 +881,14 @@ class Facet(object):
         key_formatted_repr[new_key[0].lower() + new_key[1:]] = getattr(self, k)
     return key_formatted_repr
 
+  @staticmethod
+  def prepare_expression(base_expression):
+    clean_expression = base_expression.replace("%", quote("%"))
+    if not match("^(?:grel)|(?:jython)|(?:clojure):", clean_expression):
+      clean_expression = "grel:" + clean_expression
+    print clean_expression
+    return clean_expression
+
 
 class ListFacet(Facet):
   def __init__(self, name, column_name, omit_blank=False, omit_error=False, selection=[], select_blank=True,
@@ -890,7 +898,7 @@ class ListFacet(Facet):
     selection is required
     """
     Facet.__init__(self, "list", name, column_name)
-    self.expression = ("grel:" + kwargs.get("expression", expression)).replace("%", quote("%"))
+    self.expression = Facet.prepare_expression(kwargs.get("expression", expression))
     self.omit_blank = kwargs.get("omit_blank", omit_blank)
     self.omit_error = kwargs.get("omit_error", omit_error)
     self.selection = kwargs.get("selection",
@@ -913,7 +921,7 @@ class RangeFacet(Facet):
     expression is required
     """
     Facet.__init__(self, "range", name, column_name)
-    self.expression = ("grel:" + kwargs.get("expression", expression)).replace("%", quote("%"))
+    self.expression = Facet.prepare_expression(kwargs.get("expression", expression))
     self.select_numeric = kwargs.get("select_numeric", select_numeric)
     self.select_non_numeric = kwargs.get("select_non_numeric", select_non_numeric)
     self.select_blank = kwargs.get("select_blank", select_blank)
@@ -937,7 +945,7 @@ class TimeRangeFacet(Facet):
     expression is required
     """
     Facet.__init__(self, "timerange", name, column_name)
-    self.expression = ("grel:" + kwargs.get("expression", expression)).replace("%", quote("%"))
+    self.expression = Facet.prepare_expression(kwargs.get("expression", expression))
     self.select_time = kwargs.get("select_time", select_time)
     self.select_non_time = kwargs.get("select_non_time", select_non_time)
     self.select_blank = kwargs.get("select_blank", select_blank)
