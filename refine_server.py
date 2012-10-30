@@ -395,7 +395,16 @@ class Project():
     except http_exceptions.RequestException: print "Failed to export rows."
     return response.json
 
-  def transform_column(self, column_name, grel_expression, on_error="keep-original", repeat=False, repeat_count=1):
+  @staticmethod
+  def prepare_expression(base_expression):
+    clean_expression = base_expression
+    if not match("^(?:grel)|(?:jython)|(?:clojure):", clean_expression):
+      clean_expression = "grel:" + clean_expression
+    if DEBUG:
+      print clean_expression
+    return clean_expression
+
+  def transform_column(self, column_name, expression, on_error="keep-original", repeat=False, repeat_count=1, *args, **kwargs):
     """
     on_error options: keep-original, set-to-blank, store-error
     repeat default is false but can be set to true in which case repeat_count should be set to the number of iterations
@@ -403,10 +412,20 @@ class Project():
     try:
       response = self.server.post(
         "command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
-          column_name, grel_expression, on_error, repeat, repeat_count, self.id))
+          column_name,
+          Project.prepare_expression(expression),
+          kwargs.get("on_error", on_error),
+          kwargs.get("repeat", repeat),
+          kwargs.get("repeat_count", repeat_count),
+          self.id))
     except http_exceptions.RequestException:
       print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
-        column_name, grel_expression, on_error, repeat, repeat_count, self.id)
+        column_name,
+        Project.prepare_expression(expression),
+        kwargs.get("on_error", on_error),
+        kwargs.get("repeat", repeat),
+        kwargs.get("repeat_count", repeat_count),
+        self.id)
 
   def _get_import_job_status(self, job_id):
 
