@@ -28,24 +28,4 @@ pip-log.txt
 
 
 env/
-.idea/.name
-
-.idea/encodings.xml
-
-.idea/py-refine-client.iml
-
-.idea/other.xml
-
-.idea/modules.xml
-
-.idea/misc.xml
-
-.idea/workspace.xml
-
-.idea/vcs.xml
-
-.idea/testrunner.xml
-
-.idea/scopes/scope_settings.xml
-
-.idea/inspectionProfiles/profiles_settings.xml
+.idea/
