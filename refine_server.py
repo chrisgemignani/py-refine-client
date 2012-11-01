@@ -905,7 +905,8 @@ class Facet(object):
     clean_expression = base_expression.replace("%", quote("%"))
     if not match("^(?:grel)|(?:jython)|(?:clojure):", clean_expression):
       clean_expression = "grel:" + clean_expression
-    print clean_expression
+    if DEBUG:
+      print clean_expression
     return clean_expression
 
 
