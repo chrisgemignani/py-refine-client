@@ -658,7 +658,8 @@ class Project():
 
   def _create_project_from_url(self, url, job_id, name, **kwargs):
 
-    print "Fetching {0}".format(url)
+    if DEBUG:
+      print "Fetching {0}".format(url)
 
     mime_type = http_get(url).headers["content-type"]
 
