@@ -712,7 +712,8 @@ class Project():
     if url:
       content = http_get(url).text
     elif path:
-      content = file.open(path,'r').readlines(1000)
+      with open(path,'r') as f:
+        content = f.readline()
 
     if match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|,)+$", content):
       return ","
@@ -729,7 +730,7 @@ class Project():
       content = json.loads(file.open(path,'r').read())
     path = []
 
-    # Note that google refine's expects a nameless node to be specified as "__anonymous__", e.g. the root node
+    # Note that google refine expects a nameless node to be specified as "__anonymous__", e.g. the root node
     def recurse(node, route):
       if DEBUG:
         print "Route state {0}".format(route)
