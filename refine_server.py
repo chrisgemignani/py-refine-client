@@ -12,7 +12,11 @@ from re import IGNORECASE, search, sub
 
 
 DEBUG = False
+TIMING = True
 DEFAULT_MIME_TYPE = "text/csv"
+
+if TIMING:
+  from time import time
 
 class RefineFormat(object):
   """
@@ -264,7 +268,9 @@ class Project():
     self._columns = []
     self.row_set = None
     if not self.id:
+      if TIMING: start = time()
       job_id = self._fetch_new_job()
+      if TIMING: print "REFINE : fetching new job ID took {0}".format(time() - start)
       if path or "path" in kwargs:
         self._create_project_from_file(kwargs.get("path", path), job_id, kwargs.get("name", name), **kwargs)
       elif url or "url" in kwargs:
@@ -381,6 +387,8 @@ class Project():
 
   def export(self, filename, template, format="template", prefix="{\"rows\":[", suffix="]}",
              separator=",", sorting=[], facets=[], mode="row-based", *args, **kwargs):
+
+    if TIMING: start = time()
     data = {"project": self.id,
             "engine": json.dumps({"facets": [f.refine_formatted() for f in kwargs.get("facets", facets)],
                                   "mode": kwargs.get("mode", mode)}),
@@ -393,6 +401,7 @@ class Project():
     try:
       response = self.server.post("command/core/export-rows/{0}".format(filename), **{"data": data})
     except http_exceptions.RequestException: print "Failed to export rows."
+    if TIMING: print "REFINE : exporting took {0} seconds".format(time() - start)
     return response.json
 
   @staticmethod
@@ -405,6 +414,7 @@ class Project():
     return clean_expression
 
   def transform_column(self, column_name, expression, on_error="keep-original", repeat=False, repeat_count=1, *args, **kwargs):
+    if TIMING: start = time()
     """
     on_error options: keep-original, set-to-blank, store-error
     repeat default is false but can be set to true in which case repeat_count should be set to the number of iterations
@@ -426,6 +436,7 @@ class Project():
         kwargs.get("repeat", repeat),
         kwargs.get("repeat_count", repeat_count),
         self.id)
+    if TIMING: print "REFINE : transforming column took {0} seconds".format(time() - start)
 
   def _get_import_job_status(self, job_id):
 
@@ -445,7 +456,7 @@ class Project():
                                                                   response.json["job"]["config"]["errorDetails"]))
         job_status = ImportJobDetails(**response.json["job"]["config"])
         while job_status.state != "ready" and job_status.state != "created-project":
-          sleep(1)
+          sleep(0.25)
           try:
             response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
             job_status = ImportJobDetails(**response.json["job"]["config"])
@@ -626,34 +637,56 @@ class Project():
   def _create_project_from_file(self, path, job_id, name, **kwargs):
 
     files = {'file': (basename(path), open(path, 'rb'))}
+
+    if TIMING: start = time()
     response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
                                  "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files": files})
     if response and response.json:
       print "Failed to load data source {0}. ".format(path) + response.json # error message
+    if TIMING: print "REFINE : load raw data took {0} seconds".format(time() - start)
 
+    if TIMING: start = time()
     job_status = self._get_import_job_status(job_id) # polls for import completion
+    if TIMING: print "REFINE : polling for status took {0} seconds".format(time() - start)
 
     if DEBUG:
       print job_status
 
     mime_type = job_status.ranked_formats[0]
+    if mime_type == "text/line-based" or mime_type == "text/line-based/fixed-width" and kwargs.has_key("separator"):
+      if kwargs.get("separator") == ",":
+        mime_type = "text/line-based/*sv"
+
     if mime_type=="text/json" and not kwargs.has_key("record_path") and not kwargs.has_key("recordPath"):
+      if TIMING: start = time()
       kwargs["recordPath"] = Project.identify_json_record_path(None, path)
+      if TIMING: print "REFINE : identifying JSON path took {0} seconds".format(time() - start)
+
     elif mime_type=="text/line-based/*sv" and not kwargs.has_key("separator"):
+      if TIMING: start = time()
       kwargs["separator"]=Project.sv_separator(None, path)
+      if TIMING: print "REFINE : identifying *SV separator took {0} seconds".format(time() - start)
       if DEBUG:
         print "Selected *sv separator {0}".format(kwargs["separator"])
 
+    if TIMING: start = time()
     presets = self._initialize_parser(job_id, mime_type)
+    if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
     presets.update(kwargs)
+    if TIMING: start = time()
     update_response = self._update_format(job_id, mime_type, **presets)
+    if TIMING: print "REFINE : updating format took {0} seconds".format(time() - start)
 
     if DEBUG:
       print "Presets : {0}".format(presets)
 
+    if TIMING: start = time()
     self._fetch_models(job_id)
+    if TIMING: print "REFINE : fetching models took {0} seconds".format(time() - start)
 
+    if TIMING: start = time()
     self._create(job_id, mime_type, name, **kwargs)
+    if TIMING: print "REFINE : creating project took {0} seconds".format(time() - start)
 
 
   def _create_project_from_url(self, url, job_id, name, **kwargs):
@@ -676,13 +709,18 @@ class Project():
 
     if mime_type=="text/json" and not kwargs.has_key("record_path") and not kwargs.has_key(
       "recordPath"):
+      if TIMING: start = time()
       kwargs["recordPath"] = Project.identify_json_record_path(url)
+      if TIMING: print "REFINE : identifying JSON path took {0} seconds".format(time() - start)
     elif mime_type=="text/line-based/*sv" and not kwargs.has_key("separator"):
+      if TIMING: start = time()
       kwargs["separator"]=Project.sv_separator(url)
+      if TIMING: print "REFINE : identifying *SV separator took {0} seconds".format(time() - start)
       if DEBUG:
         print "Selected *sv separator {0}".format(kwargs["separator"])
 
     boundary = choose_boundary()
+    if TIMING: start = time()
     data = "--{0}\r\nContent-Disposition: form-data; name=\"download\"\r\n\r\n{1}\r\n--{0}--".format(boundary, url)
     headers = {"content-type": "multipart/form-data; boundary={0}".format(boundary)}
     response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
@@ -690,8 +728,11 @@ class Project():
                                 **{"data": data, "headers": headers})
     if response and response.json:
       print "Failed to load data source {0}. ".format(url) + response.json
+    if TIMING: print "REFINE : load raw data took {0} seconds".format(time() - start)
 
+    if TIMING: start = time()
     job_status = self._get_import_job_status(job_id) # polls for import completion
+    if TIMING: print "REFINE : polling for status took {0} seconds".format(time() - start)
 
     if mime_type == "text/line-based" and job_status.ranked_formats[0] != mime_type:
       mime_type = job_status.ranked_formats[0]
@@ -699,13 +740,21 @@ class Project():
     if DEBUG:
       print "Running with MIME Type : {0}".format(mime_type)
     if mime_type:
+      if TIMING: start = time()
       presets = self._initialize_parser(job_id, mime_type)
+      if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
     presets.update(kwargs)
+    if TIMING: start = time()
     update_response = self._update_format(job_id, mime_type, **presets)
+    if TIMING: print "REFINE : updating format took {0} seconds".format(time() - start)
 
+    if TIMING: start = time()
     self._fetch_models(job_id)
+    if TIMING: print "REFINE : fetching models took {0} seconds".format(time() - start)
 
+    if TIMING: start = time()
     self._create(job_id, mime_type, name, **presets)
+    if TIMING: print "REFINE : creating project took {0} seconds".format(time() - start)
 
   @staticmethod
   def sv_separator(url=None, path=None):
@@ -802,21 +851,25 @@ class Project():
     return response
 
   def compute_facets(self, mode="row-based"):
+    if TIMING: start = time()
     try:
       response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
                                   **{
                                     "data": "engine={0}".format(
                                       json.dumps({"facets": [f.refine_formatted() for f in self.facets], "mode": mode}))})
+      if TIMING: print "REFINE : computing facets took {0} seconds".format(time() - start)
       return [FacetComputation(**f) for f in response.json["facets"]]
     except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(
       self.id)
 
   def test_facets(self, test_facets, mode="row-based"):
+    if TIMING: start = time()
     try:
       response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
                                   **{
                                     "data": "engine={0}".format(
                                       json.dumps({"facets": [f.refine_formatted() for f in test_facets], "mode": mode}))})
+      if TIMING: print "REFINE : testing facets took {0} seconds".format(time() - start)
       return [FacetComputation(**f) for f in response.json["facets"]]
     except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed for test case.".format(
       self.id)
