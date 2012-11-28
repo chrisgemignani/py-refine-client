@@ -315,9 +315,10 @@ class Project():
 
   def rename_column(self, old_name, new_name):
     try: response = self.server.post(("/command/core/rename-column?oldColumnName={0}"
-                                      "&newColumnName={1}&project={2}".format(old_name, new_name, self.id)))
+                                      "&newColumnName={1}&project={2}".format(quote(old_name), quote(new_name),
+                                                                              self.id)))
     except http_exceptions.RequestException: print("Request /command/core/rename-column?oldColumnName={0}"
-                                                   "&newColumnName={1}&project={2}".format(old_name, new_name, self.id))
+                                                   "&newColumnName={1}&project={2}".format(quote(old_name), quote(new_name), self.id))
 
   @property
   def sort_criteria(self):
@@ -422,7 +423,7 @@ class Project():
     try:
       response = self.server.post(
         "command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
-          column_name,
+          quote(column_name),
           Project.prepare_expression(expression),
           kwargs.get("on_error", on_error),
           kwargs.get("repeat", repeat),
@@ -430,7 +431,7 @@ class Project():
           self.id))
     except http_exceptions.RequestException:
       print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
-        column_name,
+        quote(column_name),
         Project.prepare_expression(expression),
         kwargs.get("on_error", on_error),
         kwargs.get("repeat", repeat),
@@ -541,7 +542,7 @@ class Project():
         'limit': kwargs.get("limit", -1),
         'separator': kwargs.get("separator", None),
         'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
-        'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 0)),
+        'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
         'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
         'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
         'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False)),
@@ -823,28 +824,30 @@ class Project():
       # refine wants the first record node, not the list node comprising it
     return path
 
-  def split_multi_value_cell(self, column, key_column, separator):
+  def split_multi_value_cell(self, column_name, key_column, separator):
     try:
       response = self.server.post(("command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}"
-                                   "&separator={2}&mode=plain&project={3}".format(column, key_column,
+                                   "&separator={2}&mode=plain&project={3}".format(quote(column_name),
+                                                                                  quote(key_column),
                                                                                   separator, self.id)))
     except http_exceptions.RequestException: print "Unable to split cell."
 
-  def split_column_by_separator(self, column, separator=",", regex=False, remove_original=True, guess_cell_type=True):
+  def split_column_by_separator(self, column_name, separator=",", regex=False, remove_original=True,
+                                guess_cell_type=True):
     try:
       response = self.server.post(("command/core/split-column?columnName={0}&mode=separator&project={1}"
                                    "&guessCellType={2}&removeOriginalColumn={3}&separator={4}"
-                                   "&regex={5}".format(column, self.id, str(guess_cell_type).lower(),
+                                   "&regex={5}".format(quote(column_name), self.id, str(guess_cell_type).lower(),
                                                        str(remove_original).lower(), quote_plus(separator),
                                                        quote_plus(regex) if regex else "false")))
       self._fetch_models()
     except http_exceptions.RequestException: print "Unable to split column."
 
-  def split_column_by_field_length(self, column, lengths, remove_original=True, guess_cell_type=True):
+  def split_column_by_field_length(self, column_name, lengths, remove_original=True, guess_cell_type=True):
     try:
       response = self.server.post(("command/core/split-column?columnName={0}&mode=lengths&project={1}"
                                    "&guessCellType={2}&removeOriginalColumn={3}"
-                                   "&fieldLengths={4}".format(column, self.id, str(guess_cell_type).lower(),
+                                   "&fieldLengths={4}".format(quote(column_name), self.id, str(guess_cell_type).lower(),
                                                               str(remove_original).lower(), quote_plus(lengths))))
       self._fetch_models()
     except http_exceptions.RequestException: print "Unable to split column."
@@ -909,7 +912,7 @@ class SortCriterion(object):
     """
 
     if column_type == "string": self.case_sensitive = kwargs.get("case_sensitive", False)
-    self.column_name = column_name
+    self.column_name = quote(column_name)
     self.column_type = column_type
     self.reverse = reverse
     self.blank_position = blank_position
@@ -936,7 +939,7 @@ class Facet(object):
   def __init__(self, type, name, column_name, *args, **kwargs):
     self.type = kwargs.get("type", type)
     self.name = kwargs.get("name", name)
-    self.column_name = kwargs.get("column_name", column_name)
+    self.column_name = quote(kwargs.get("column_name", column_name))
     for k in kwargs.keys(): setattr(self, k, kwargs.get(k, None))
 
   def __unicode__(self):
