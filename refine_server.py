@@ -12,7 +12,7 @@ from re import IGNORECASE, search, sub
 
 
 DEBUG = False
-TIMING = True
+TIMING = False
 DEFAULT_MIME_TYPE = "text/csv"
 
 if TIMING:
@@ -98,13 +98,21 @@ class RefineServer(object):
     if DEBUG:
       print "REQUEST URL : {0}".format(str(action))
     try:
-      return http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
+      response = http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
+      if DEBUG and action.find("get-rows") == -1:
+        try:
+          print(("RESPONSE : {0}").format(response.text))
+        except Exception as e:
+          print e
+      return response
     except http_exceptions.RequestException:
       raise
 
   def post(self, action, data=None, headers=None, files=None, **kwargs):
     if DEBUG:
-      print "REQUEST URL : {0}\nDATA : {1}\nHEADERS : {2}".format(str(action), str(data), str(headers))
+      print "REQUEST URL : {0}\nDATA : {1}\nHEADERS : {2}".format(str(action),
+                                                                  str(kwargs.get("data", data)),
+                                                                  str(kwargs.get("headers", headers)))
     try:
       new_kwargs = {"data": kwargs.get("data", data),
                     "files": kwargs.get("files", files),
@@ -346,14 +354,15 @@ class Project():
 
   @property
   def processes(self):
-    try: response = self.server.post("command/core/get-processes?project={0}".format(self.id))
+    try: response = self.server.get("command/core/get-processes?project={0}".format(self.id))
     except http_exceptions.RequestException: print "Request command/core/get-processes?project={0} failed.".format(
       self.id)
-    if response: return response.json["processes"]
+    if response:
+      return response.json["processes"]
 
   @property
   def metadata(self):
-    try: return self.server.post("command/core/get-project-metadata?project={0}".format(self.id))
+    try: return self.server.get("command/core/get-project-metadata?project={0}".format(self.id))
     except http_exceptions.RequestException: print "Request command/core/get-project-metadata?project={0}".format(
       self.id)
 
@@ -363,23 +372,27 @@ class Project():
 
   @property
   def columns(self):
-    self._fetch_models()
+    self._columns = self._fetch_models()
     return self._columns
 
   def rows(self, job_id=None, offset=0, limit=-1, mode="row-based"):
+    if TIMING: start = time()
     try:
       if job_id:
+        data = {"callback": "jsonp{0}".format(randint(1000000000000, 1999999999999))}
         response = self.server.post(
           "command/core/get-rows?importingJobID={0}&start={1}&limit={2}".format(job_id, offset, limit),
-          **{"data": {"callback": "jsonp{0}".format(randint(1000000000000, 1999999999999))}})
+          **{"data": data})
       else:
         callback = "jsonp{0}".format(randint(1000000000000, 1999999999999))
+        data = {"engine": json.dumps({"facets": [f.refine_formatted() for f in self.facets], "mode": mode}),
+                "sorting": json.dumps({"criteria": [s.refine_formatted() for s in self.sort_criteria]}),
+                "callback": callback}
         response = self.server.post(("command/core/get-rows?project={0}&start={1}&limit={2}"
                                      "&callback={3}".format(self.id, offset, limit, callback)),
-                                    **{"data": "engine={0}&sorting={1}&callback={2}".format(
-                                      json.dumps({"facets": [f.refine_formatted() for f in self.facets], "mode": mode}),
-                                      json.dumps({"criteria": [s.refine_formatted() for s in self.sort_criteria]}), callback)})
+                                    **{"data": data})
     except Exception: print "Unable to retrieve rows."
+    if TIMING: print "REFINE : getting rows took {0} seconds".format(time() - start)
     if response:
       response = json.loads(response.text[19:-1])
       self.row_set = RowSet(offset, limit, response["filtered"], response["total"], response["rows"])
@@ -853,13 +866,21 @@ class Project():
     except http_exceptions.RequestException: print "Unable to split column."
     return response
 
+  def remove_rows(self, facets=[], mode="row-based"):
+    if TIMING: start = time()
+    try:
+      response = self.server.post("command/core/remove-rows?project={0}".format(self.id),
+                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in facets], "mode": mode})}})
+      if TIMING: print "REFINE : removing rows took {0} seconds".format(time() - start)
+    except http_exceptions.RequestException: print "Request command/core/remove-rows?project={0} failed.".format(
+      self.id)
+
   def compute_facets(self, mode="row-based"):
     if TIMING: start = time()
     try:
       response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
-                                  **{
-                                    "data": "engine={0}".format(
-                                      json.dumps({"facets": [f.refine_formatted() for f in self.facets], "mode": mode}))})
+                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
+                                  .facets], "mode": mode})}})
       if TIMING: print "REFINE : computing facets took {0} seconds".format(time() - start)
       return [FacetComputation(**f) for f in response.json["facets"]]
     except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(
@@ -871,18 +892,52 @@ class Project():
       response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
                                   **{
                                     "data": "engine={0}".format(
-                                      json.dumps({"facets": [f.refine_formatted() for f in test_facets], "mode": mode}))})
+                                      json.dumps({"facets": [f.refine_formatted() for f in test_facets],
+                                                  "mode": mode}))})
       if TIMING: print "REFINE : testing facets took {0} seconds".format(time() - start)
       return [FacetComputation(**f) for f in response.json["facets"]]
     except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed for test case.".format(
       self.id)
 
-  def roll_to_history_entry(self, history_entry, mode="row-based"):
-    try: return self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(history_entry, self.id),
-                                 **{
-                                   "data": {
-                                     "engine={0}".format(json.dumps({"mode": mode, "facets": [f.refine_formatted() for f in self.facets]}))}})
-    except http_exceptions.RequestException: print "Unable to go to history entry."
+
+  def flag_row(self, row_number, state="true", mode="row-based"):
+    try:
+      response = self.server.post("command/core/annotate-one-row?flagged={2}&row={0}&project={1}".format(
+        row_number, self.id, state), **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
+      .facets], "mode": mode})}})
+    except http_exceptions.RequestException: print "Unable to flag row {0}.".format(row_number)
+
+  def flag_rows(self, state="true", mode="row-based"):
+    try:
+      response = self.server.post("command/core/annotate-rows?flagged={1}&project={0}".format(self.id, state),
+                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
+                                  .facets], "mode": mode})}})
+    except http_exceptions.RequestException: print "Unable to flag rows."
+
+  def star_row(self, row_number, state="true", mode="row-based"):
+    try:
+      response = self.server.post("command/core/annotate-one-row?starred={2}&row={0}&project={1}".format(
+        row_number, self.id, state), **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
+      .facets], "mode": mode})}})
+    except http_exceptions.RequestException: print "Unable to star row {0}.".format(row_number)
+
+  def star_rows(self, state="true", mode="row-based"):
+    try:
+      response = self.server.post("command/core/annotate-rows?starred={1}&project={0}".format(self.id, state),
+                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
+                                  .facets], "mode": mode})}})
+    except http_exceptions.RequestException: print "Unable to star rows."
+
+  def undo_redo(self, project_version=0, mode="row-based"):
+    if TIMING: start = time()
+    data = {"engine":json.dumps({"facets": [f.refine_formatted() for f in self.facets],
+                                 "mode": mode})}
+    try:
+      response = self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(
+        project_version, self.id), **{"data": data})
+    except http_exceptions.RequestException: print "Unable to undo/redo to version {0}.".format(project_version)
+    if TIMING: print "REFINE : undo/redo took {0} seconds".format(time() - start)
+
 
 
 class HistoryEntry(object):
@@ -969,9 +1024,10 @@ class Facet(object):
 
 
 class ListFacet(Facet):
-  def __init__(self, name, column_name, omit_blank=False, omit_error=False, selection=[], select_blank=True,
-               select_error=True, invert=False, expression="value", *args, **kwargs):
+  def __init__(self, name="", column_name="", omit_blank=False, omit_error=False, selection=[], select_blank=False,
+               select_error=False, invert=False, expression="value", *args, **kwargs):
     """
+    name and column name can be empty strings because facets can be applied to entire rows e.g. flagged
     expression is required
     selection is required
     """
@@ -979,8 +1035,8 @@ class ListFacet(Facet):
     self.expression = Facet.prepare_expression(kwargs.get("expression", expression))
     self.omit_blank = kwargs.get("omit_blank", omit_blank)
     self.omit_error = kwargs.get("omit_error", omit_error)
-    self.selection = kwargs.get("selection",
-                                selection) # v stands for value and l stands for label: [{"v":{"v":"video","l":"video"}}]
+    self.selection = kwargs.get("selection", selection)
+    # selection - v stands for value and l stands for label: [{"v":{"v":"video","l":"video"}}]
     self.select_blank = kwargs.get("select_blank", select_blank)
     self.select_error = kwargs.get("select_error", select_error)
     self.invert = kwargs.get("invert", invert)
