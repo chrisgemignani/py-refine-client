@@ -993,7 +993,7 @@ class SortCriterion(object):
 class Facet(object):
   def __init__(self, type, name, column_name, *args, **kwargs):
     self.type = kwargs.get("type", type)
-    self.name = kwargs.get("name", name)
+    self.name = quote(kwargs.get("name", name))
     self.column_name = quote(kwargs.get("column_name", column_name))
     for k in kwargs.keys(): setattr(self, k, kwargs.get(k, None))
 
@@ -1140,7 +1140,10 @@ class FacetComputation(object):
                     s: a Boolean indicating whether this value is selected as part of this facet (allowing for multi-select)
 
     """
-    for k in kwargs.keys(): setattr(self, k, kwargs.get(k, None))
+    for k in kwargs.keys():
+      quoted = kwargs.get(k, None)
+      if isinstance(quoted, str): quoted = quote(quoted)
+      setattr(self, k, quoted)
 
   def __unicode__(self):
     return "\n".join(["{0}: {1}".format(k, getattr(self, k)) for k in self.__dict__.keys()])
