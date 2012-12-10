@@ -1,5 +1,5 @@
 from requests import get as http_get, post as http_post, codes as http_codes, exceptions as http_exceptions
-from urllib import quote, quote_plus
+from urllib import quote_plus
 from random import randint
 from re import match
 try: import simplejson as json
@@ -8,7 +8,6 @@ from os.path import basename
 from time import sleep
 from mimetools import choose_boundary
 from datetime import datetime
-from re import IGNORECASE, search, sub
 
 
 DEBUG = False
@@ -24,11 +23,11 @@ class RefineFormat(object):
   """
 
   def __init__(self, id=None, name=None, label=None, download=None, ui_class=None, *args, **kwargs):
-    self.id = kwargs.get('id', id)
-    self.name = kwargs.get('name', name)
-    self.label = kwargs.get('label', label)
-    self.download = kwargs.get('download', download)
-    self.uiClass = kwargs.get('uiClass', ui_class)
+    self.id = kwargs.get("id", id)
+    self.name = kwargs.get("name", name)
+    self.label = kwargs.get("label", label)
+    self.download = kwargs.get("download", download)
+    self.uiClass = kwargs.get("uiClass", ui_class)
 
   def __unicode__(self):
     return self.name
@@ -44,10 +43,10 @@ class RefineConfiguration(object):
 
   def __init__(self, **kwargs):
     if kwargs:
-      self.formats = [RefineFormat(name=k, **kwargs['formats'][k])\
-                      for k in kwargs['formats'].keys()]
-      self.mime_types = kwargs['mimeTypeToFormat']
-      self.file_extensions = kwargs['extensionToFormat']
+      self.formats = [RefineFormat(name=k, **kwargs["formats"][k])\
+                      for k in kwargs["formats"].keys()]
+      self.mime_types = kwargs["mimeTypeToFormat"]
+      self.file_extensions = kwargs["extensionToFormat"]
     else:
       self.formats = None
       self.mime_types = None
@@ -66,10 +65,10 @@ class RefineVersion(object):
   """
 
   def __init__(self, full_name=None, full_version=None, revision=None, version=None, *args, **kwargs):
-    self.full_name = kwargs.get('full_name', full_name)
-    self.full_version = kwargs.get('full_version', full_version)
-    self.revision = kwargs.get('revision', revision)
-    self.version = kwargs.get('version', version)
+    self.full_name = kwargs.get("full_name", full_name)
+    self.full_version = kwargs.get("full_version", full_version)
+    self.revision = kwargs.get("revision", revision)
+    self.version = kwargs.get("version", version)
 
   def __unicode__(self):
     return self.full_version
@@ -83,10 +82,10 @@ class RefineServer(object):
   Docstring
   """
 
-  def __init__(self, protocol='http', host='127.0.0.1', port='3333', *args, **kwargs):
-    self.protocol = kwargs.get('protocol', protocol)
-    self.host = kwargs.get('host', host)
-    self.port = kwargs.get('port', port)
+  def __init__(self, protocol="http", host="127.0.0.1", port="3333", *args, **kwargs):
+    self.protocol = kwargs.get("protocol", protocol)
+    self.host = kwargs.get("host", host)
+    self.port = kwargs.get("port", port)
 
   def __unicode__(self):
     return "{0}://{1}:{2}".format(self.protocol, self.host, self.port)
@@ -103,9 +102,10 @@ class RefineServer(object):
         try:
           print(("RESPONSE : {0}").format(response.text))
         except Exception as e:
-          print e
+          print e.message
       return response
-    except http_exceptions.RequestException:
+    except http_exceptions.RequestException as e:
+      if DEBUG: print "Request {0} failed. {1}".format(action, response)
       raise
 
   def post(self, action, data=None, headers=None, files=None, **kwargs):
@@ -117,14 +117,17 @@ class RefineServer(object):
       new_kwargs = {"data": kwargs.get("data", data),
                     "files": kwargs.get("files", files),
                     "headers": kwargs.get("headers", headers)}
-      response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), **new_kwargs)
+      response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action),
+                           **new_kwargs)
       if DEBUG and action.find("get-rows") == -1:
         try:
           print(("RESPONSE : {0}").format(response.text))
         except Exception as e:
-          print e
+          print e.message
       return response
-    except http_exceptions.RequestException: print "Request {0} failed.".format(action)
+    except http_exceptions.RequestException as e:
+      if DEBUG: print "Request {0} failed. {1}".format(action, response)
+      raise
 
   def destroy_all_projects(self):
     for p in self.projects:
@@ -141,7 +144,7 @@ class RefineServer(object):
   def projects(self):
     response = self.get("command/core/get-all-project-metadata")
     if response.status_code == http_codes.ok:
-      return [Project(id=pid) for pid in response.json['projects'].keys()]
+      return [Project(id=pid) for pid in response.json["projects"].keys()]
     else:
       print "Request command/core/get-all-project-metadata failed."
 
@@ -149,10 +152,18 @@ class RefineServer(object):
   def configuration(self):
     response = self.post("command/core/get-importing-configuration")
     if response.status_code == http_codes.ok:
-      return RefineConfiguration(**response.json['config'])
+      return RefineConfiguration(**response.json["config"])
     else:
       print "Request command/core/get-importing-configuration failed."
 
+  @staticmethod
+  def simple_quote(unsafe):
+    if DEBUG:
+      print "ORIGINAL : {0}".format(unsafe)
+    quoted = quote_plus(unsafe)
+    if DEBUG:
+      print "QUOTED : {0}".format(quoted)
+    return quoted
 
 class DataSource(object):
   """
@@ -161,12 +172,12 @@ class DataSource(object):
 
   def __init__(self, declared_mime_type=None, location=None, file_name=None, origin=None, url=None,
                size=None, *args, **kwargs):
-    self.declared_mime_type = kwargs.get('declaredMimeType', declared_mime_type)
-    self.location = kwargs.get('location', location)
-    self.fileName = kwargs.get('fileName', file_name)
-    self.origin = kwargs.get('origin', origin)
-    self.url = kwargs.get('url', url)
-    self.size = kwargs.get('size', size)
+    self.declared_mime_type = kwargs.get("declaredMimeType", declared_mime_type)
+    self.location = kwargs.get("location", location)
+    self.fileName = kwargs.get("fileName", file_name)
+    self.origin = kwargs.get("origin", origin)
+    self.url = kwargs.get("url", url)
+    self.size = kwargs.get("size", size)
 
   def __unicode__(self):
     return "{0} {1} {2} {3}".format(self.location, self.fileName, self.declared_mime_type, self.size)
@@ -182,11 +193,11 @@ class RetrievalRecord():
 
   def __init__(self, files=None, download_count=None, archive_count=None, clipboard_count=None,
                upload_count=None, *args, **kwargs):
-    self.files = [DataSource(**f) for f in kwargs.get('files', files)]
-    self.download_count = kwargs.get('downloadCount', download_count)
-    self.archive_count = kwargs.get('archiveCount', archive_count)
-    self.clipboard_count = kwargs.get('clipboardCount', clipboard_count)
-    self.upload_count = kwargs.get('uploadCount', upload_count)
+    self.files = [DataSource(**f) for f in kwargs.get("files", files)]
+    self.download_count = kwargs.get("downloadCount", download_count)
+    self.archive_count = kwargs.get("archiveCount", archive_count)
+    self.clipboard_count = kwargs.get("clipboardCount", clipboard_count)
+    self.upload_count = kwargs.get("uploadCount", upload_count)
 
   def __unicode__(self):
     return ("{0} downloads, {1} archives, "
@@ -200,14 +211,14 @@ class RetrievalRecord():
 class ImportJobDetails():
   def __init__(self, ranked_formats=None, has_data=None, state=None, file_selection=None,
                retrieval_record=None, *args, **kwargs):
-    self.ranked_formats = kwargs.get('rankedFormats',
+    self.ranked_formats = kwargs.get("rankedFormats",
                                      ranked_formats) # array of mime types in order of best guess for this data source
-    self.has_data = kwargs.get('hasData', has_data)
-    self.state = kwargs.get('state', state)
-    self.file_selection = kwargs.get('fileSelection',
+    self.has_data = kwargs.get("hasData", has_data)
+    self.state = kwargs.get("state", state)
+    self.file_selection = kwargs.get("fileSelection",
                                      file_selection) # an array of indices that correspond to values in retrievalRecord["files"]
     if retrieval_record or "retrievalRecord" in kwargs:
-      self.retrieval_record = RetrievalRecord(**kwargs.get('retrievalRecord', retrieval_record))
+      self.retrieval_record = RetrievalRecord(**kwargs.get("retrievalRecord", retrieval_record))
     else:
       self.retrieval_record = None
 
@@ -270,7 +281,7 @@ class Project():
     """
 
     self.server = server
-    self.id = kwargs.get('id', id)
+    self.id = kwargs.get("id", id)
     self._facets = []
     self._sort_critieria = []
     self._columns = []
@@ -292,7 +303,8 @@ class Project():
 
   def destroy(self):
     if self.id:
-      response = self.server.post("command/core/delete-project", **{"data": {"project": self.id}})
+      data = {"project": self.id}
+      response = self.server.post("command/core/delete-project", **{"data": json.dumps(data)})
       if response and response.json["code"] != "ok":
         print "Request command/core/delete-project failed."# placeholder - do something if it fails?
 
@@ -323,10 +335,13 @@ class Project():
 
   def rename_column(self, old_name, new_name):
     try: response = self.server.post(("/command/core/rename-column?oldColumnName={0}"
-                                      "&newColumnName={1}&project={2}".format(quote(old_name), quote(new_name),
+                                      "&newColumnName={1}&project={2}".format(RefineServer.simple_quote(old_name),
+                                                                              RefineServer.simple_quote(new_name),
                                                                               self.id)))
     except http_exceptions.RequestException: print("Request /command/core/rename-column?oldColumnName={0}"
-                                                   "&newColumnName={1}&project={2}".format(quote(old_name), quote(new_name), self.id))
+                                                   "&newColumnName={1}&project={2}".format(RefineServer.simple_quote(old_name),
+                                                                                           RefineServer.simple_quote(new_name),
+                                                                                           self.id))
 
   @property
   def sort_criteria(self):
@@ -385,8 +400,8 @@ class Project():
           **{"data": data})
       else:
         callback = "jsonp{0}".format(randint(1000000000000, 1999999999999))
-        data = {"engine": json.dumps({"facets": [f.refine_formatted() for f in self.facets], "mode": mode}),
-                "sorting": json.dumps({"criteria": [s.refine_formatted() for s in self.sort_criteria]}),
+        data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode}),
+                "sorting": json.dumps({"criteria": [s.refine_formatted_keys() for s in self.sort_criteria]}),
                 "callback": callback}
         response = self.server.post(("command/core/get-rows?project={0}&start={1}&limit={2}"
                                      "&callback={3}".format(self.id, offset, limit, callback)),
@@ -404,23 +419,24 @@ class Project():
 
     if TIMING: start = time()
     data = {"project": self.id,
-            "engine": json.dumps({"facets": [f.refine_formatted() for f in kwargs.get("facets", facets)],
+            "engine": json.dumps({"facets": [f.refine_formatted_keys() for f in kwargs.get("facets", facets)],
                                   "mode": kwargs.get("mode", mode)}),
             "template": kwargs.get("template", template),
             "format": kwargs.get("format", format),
             "prefix": kwargs.get("prefix", prefix),
             "suffix": kwargs.get("suffix", suffix),
-            "sorting": json.dumps({"criteria": [s.refine_formatted() for s in kwargs.get("sorting", sorting)]}),
+            "sorting": json.dumps({"criteria": [s.refine_formatted_keys() for s in kwargs.get("sorting", sorting)]}),
             "separator": kwargs.get("separator", separator)}
     try:
-      response = self.server.post("command/core/export-rows/{0}".format(filename), **{"data": data})
+      response = self.server.post("command/core/export-rows/{0}".format(filename),
+                                  **{"data": data})
     except http_exceptions.RequestException: print "Failed to export rows."
     if TIMING: print "REFINE : exporting took {0} seconds".format(time() - start)
     return response.json
 
   @staticmethod
   def prepare_expression(base_expression):
-    clean_expression = base_expression
+    clean_expression = RefineServer.simple_quote(base_expression)
     if not match("^(?:grel)|(?:jython)|(?:clojure):", clean_expression):
       clean_expression = "grel:" + clean_expression
     if DEBUG:
@@ -436,7 +452,7 @@ class Project():
     try:
       response = self.server.post(
         "command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
-          quote(column_name),
+          RefineServer.simple_quote(column_name),
           Project.prepare_expression(expression),
           kwargs.get("on_error", on_error),
           kwargs.get("repeat", repeat),
@@ -444,7 +460,7 @@ class Project():
           self.id))
     except http_exceptions.RequestException:
       print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
-        quote(column_name),
+        RefineServer.simple_quote(column_name),
         Project.prepare_expression(expression),
         kwargs.get("on_error", on_error),
         kwargs.get("repeat", repeat),
@@ -503,7 +519,8 @@ class Project():
     try:
       response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
                                    "&jobID={0}&subCommand=initialize-parser-ui&format={1}".format(job_id,
-                                                                                                  quote_plus(format))))
+                                                                                                  RefineServer.simple_quote(
+                                                                                                    format))))
       if DEBUG:
         print "Initialize parser : {0}".format(response.text)
       return response.json["options"]
@@ -527,15 +544,15 @@ class Project():
         "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
       },
       "text/xml/xlsx": {
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
-        'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+        "storeBlankRows": kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
+        "ignoreLines": kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
         "sheets": kwargs.get("sheets", [0]),
-        'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
-        'xmlBased': kwargs.get("xml_based", kwargs.get("xmlBased", True)),
-        'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
-        'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
-        'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
-        'limit': kwargs.get("limit", -1)
+        "skipDataLines": kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+        "xmlBased": kwargs.get("xml_based", kwargs.get("xmlBased", True)),
+        "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+        "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+        "headerLines": kwargs.get("header_lines", kwargs.get("headerLines", 1)),
+        "limit": kwargs.get("limit", -1)
       },
       "text/xml": {
         "recordPath": kwargs.get("recordPath", kwargs.get("record_path", None)),
@@ -549,74 +566,74 @@ class Project():
         "guessCellValueTypes": kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", True))
       },
       "text/line-based": {
-        'encoding': kwargs.get("encoding", ""),
-        'recordPath': kwargs.get("recordPath", kwargs.get("record_path", None)),
-        'linesPerRow': kwargs.get("lines_per_row", kwargs.get("linesPerRow", 1)),
-        'limit': kwargs.get("limit", -1),
-        'separator': kwargs.get("separator", None),
-        'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
-        'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
-        'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
-        'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False)),
-        'processQuotes': kwargs.get("process_quotes", kwargs.get("processQuotes", False)),
-        'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
-        'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
+        "encoding": kwargs.get("encoding", ""),
+        "recordPath": kwargs.get("recordPath", kwargs.get("record_path", None)),
+        "linesPerRow": kwargs.get("lines_per_row", kwargs.get("linesPerRow", 1)),
+        "limit": kwargs.get("limit", -1),
+        "separator": kwargs.get("separator", None),
+        "ignoreLines": kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+        "headerLines": kwargs.get("header_lines", kwargs.get("headerLines", 1)),
+        "skipDataLines": kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+        "storeBlankRows": kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
+        "guessCellValueTypes": kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False)),
+        "processQuotes": kwargs.get("process_quotes", kwargs.get("processQuotes", False)),
+        "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+        "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
       },
       "text/line-based/*sv": {
-        'processQuotes': kwargs.get("process_quotes", kwargs.get("processQuotes", True)),
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
-        'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
-        'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
-        'separator': kwargs.get("separator", u'\\t'),
-        'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
-        'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", True)),
-        'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
-        'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
+        "processQuotes": kwargs.get("process_quotes", kwargs.get("processQuotes", True)),
+        "storeBlankRows": kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
+        "ignoreLines": kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+        "skipDataLines": kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+        "separator": kwargs.get("separator", u"\\t"),
+        "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+        "guessCellValueTypes": kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", True)),
+        "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+        "headerLines": kwargs.get("header_lines", kwargs.get("headerLines", 1)),
         },
       "text/xml/rdf": {
-        'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
-        'encoding': kwargs.get("encoding", "")
+        "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+        "encoding": kwargs.get("encoding", "")
       },
       "text/line-based/fixed-width": {
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
-        'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
-        'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
-        'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
-        'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
-        'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1)),
-        'encoding': kwargs.get("encoding", ""),
-        'columnWidths': kwargs.get("column_widths", kwargs.get("columnWidths", None)),
-        'columnNames': kwargs.get("column_names", kwargs.get("columnNames", None)),
-        'limit': kwargs.get("limit", -1),
-        'guessCellValueTypes': kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False))
+        "storeBlankRows": kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
+        "ignoreLines": kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+        "skipDataLines": kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+        "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+        "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+        "headerLines": kwargs.get("header_lines", kwargs.get("headerLines", 1)),
+        "encoding": kwargs.get("encoding", ""),
+        "columnWidths": kwargs.get("column_widths", kwargs.get("columnWidths", None)),
+        "columnNames": kwargs.get("column_names", kwargs.get("columnNames", None)),
+        "limit": kwargs.get("limit", -1),
+        "guessCellValueTypes": kwargs.get("guess_cell_value_types", kwargs.get("guessCellValueTypes", False))
       },
       "text/line-based/pc-axis": {
-        'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
-        'limit': kwargs.get("limit", -1),
-        'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
+        "skipDataLines": kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+        "limit": kwargs.get("limit", -1),
+        "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False))
       },
       "text/xml/ods": {
-        'sheets': kwargs.get("sheets", [0]),
-        'limit': kwargs.get("limit", -1),
-        'storeBlankRows': kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
-        'ignoreLines': kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
-        'sheetRecords': kwargs.get("sheet_records", kwargs.get("sheetRecords", [])),
-        'skipDataLines': kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
-        'storeBlankCellsAsNulls': kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
-        'includeFileSources': kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
-        'headerLines': kwargs.get("header_lines", kwargs.get("headerLines", 1))
+        "sheets": kwargs.get("sheets", [0]),
+        "limit": kwargs.get("limit", -1),
+        "storeBlankRows": kwargs.get("store_blank_rows", kwargs.get("storeBlankRows", False)),
+        "ignoreLines": kwargs.get("ignore_lines", kwargs.get("ignoreLines", -1)),
+        "sheetRecords": kwargs.get("sheet_records", kwargs.get("sheetRecords", [])),
+        "skipDataLines": kwargs.get("skip_data_lines", kwargs.get("skipDataLines", 0)),
+        "storeBlankCellsAsNulls": kwargs.get("store_blank_cells_as_nulls", kwargs.get("storeBlankCellsAsNulls", True)),
+        "includeFileSources": kwargs.get("include_file_sources", kwargs.get("includeFileSources", False)),
+        "headerLines": kwargs.get("header_lines", kwargs.get("headerLines", 1))
       }
     }
     self.create_options = data_options[refine_mime_type]
 
     try:
-      headers = {'content-type': 'application/x-www-form-urlencoded'}
+      headers = {"content-type": "application/x-www-form-urlencoded"}
+      data = {"format": refine_mime_type,
+              "options": json.dumps(self.create_options)}
       return self.server.post(("command/core/importing-controller?controller=core/default-importing-controller"
                                "&jobID={0}&subCommand=update-format-and-options".format(job_id)),
-                              **{"headers": headers,
-                                 "data": "format={0}&options={1}".format(quote_plus(refine_mime_type),
-                                                                         json.dumps(self.create_options))})
+                              **{"data": data, "headers": headers})
     except Exception: print "Error updating format."
 
 
@@ -635,9 +652,10 @@ class Project():
   def _create(self, job_id, mime_type, name="default", **kwargs):
 
     try:
-      headers = {'content-type': 'application/x-www-form-urlencoded'}
+      headers = {"content-type": "application/x-www-form-urlencoded"}
       self.create_options["projectName"] = name
-      data = "format={0}&options={1}".format(quote_plus(mime_type), quote_plus(json.dumps(self.create_options)))
+      data = {"format": mime_type,
+              "options": json.dumps(self.create_options)}
       response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
                                    "&jobID={0}&subCommand=create-project".format(job_id)),
                                   **{"data": data, "headers": headers})
@@ -650,7 +668,7 @@ class Project():
 
   def _create_project_from_file(self, path, job_id, name, **kwargs):
 
-    files = {'file': (basename(path), open(path, 'rb'))}
+    files = {"file": (basename(path), open(path, "rb"))}
 
     if TIMING: start = time()
     response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
@@ -687,12 +705,11 @@ class Project():
     presets = self._initialize_parser(job_id, mime_type)
     if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
     presets.update(kwargs)
+    if DEBUG:
+      print "Presets : {0}".format(presets)
     if TIMING: start = time()
     update_response = self._update_format(job_id, mime_type, **presets)
     if TIMING: print "REFINE : updating format took {0} seconds".format(time() - start)
-
-    if DEBUG:
-      print "Presets : {0}".format(presets)
 
     if TIMING: start = time()
     self._fetch_models(job_id)
@@ -758,6 +775,8 @@ class Project():
       presets = self._initialize_parser(job_id, mime_type)
       if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
     presets.update(kwargs)
+    if DEBUG:
+      print "Presets {0}".format(presets)
     if TIMING: start = time()
     update_response = self._update_format(job_id, mime_type, **presets)
     if TIMING: print "REFINE : updating format took {0} seconds".format(time() - start)
@@ -776,13 +795,13 @@ class Project():
     if url:
       content = http_get(url).text
     elif path:
-      with open(path,'r') as f:
+      with open(path,"r") as f:
         content = f.readline()
 
     if match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|,)+$", content):
       return ","
     elif match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|\t)+$", content):
-      return u'\\t'
+      return u"\\t"
     elif match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|;)+$", content):
       return ";"
 
@@ -791,7 +810,7 @@ class Project():
     if url:
       content = http_get(url).json
     elif path:
-      content = json.loads(file.open(path,'r').read())
+      content = json.loads(file.open(path,"r").read())
     path = []
 
     # Note that google refine expects a nameless node to be specified as "__anonymous__", e.g. the root node
@@ -840,8 +859,8 @@ class Project():
   def split_multi_value_cell(self, column_name, key_column, separator):
     try:
       response = self.server.post(("command/core/split-multi-value-cells?columnName={0}&keyColumnName={1}"
-                                   "&separator={2}&mode=plain&project={3}".format(quote(column_name),
-                                                                                  quote(key_column),
+                                   "&separator={2}&mode=plain&project={3}".format(RefineServer.simple_quote(column_name),
+                                                                                  RefineServer.simple_quote(key_column),
                                                                                   separator, self.id)))
     except http_exceptions.RequestException: print "Unable to split cell."
 
@@ -850,9 +869,11 @@ class Project():
     try:
       response = self.server.post(("command/core/split-column?columnName={0}&mode=separator&project={1}"
                                    "&guessCellType={2}&removeOriginalColumn={3}&separator={4}"
-                                   "&regex={5}".format(quote(column_name), self.id, str(guess_cell_type).lower(),
-                                                       str(remove_original).lower(), quote_plus(separator),
-                                                       quote_plus(regex) if regex else "false")))
+                                   "&regex={5}".format(RefineServer.simple_quote(column_name), self.id,
+                                                       str(guess_cell_type).lower(),
+                                                       str(remove_original).lower(),
+                                                       RefineServer.simple_quote(separator),
+                                                       RefineServer.simple_quote(regex) if regex else "false")))
       self._fetch_models()
     except http_exceptions.RequestException: print "Unable to split column."
 
@@ -860,8 +881,10 @@ class Project():
     try:
       response = self.server.post(("command/core/split-column?columnName={0}&mode=lengths&project={1}"
                                    "&guessCellType={2}&removeOriginalColumn={3}"
-                                   "&fieldLengths={4}".format(quote(column_name), self.id, str(guess_cell_type).lower(),
-                                                              str(remove_original).lower(), quote_plus(lengths))))
+                                   "&fieldLengths={4}".format(RefineServer.simple_quote(column_name), self.id,
+                                                              str(guess_cell_type).lower(),
+                                                              str(remove_original).lower(),
+                                                              RefineServer.simple_quote(lengths))))
       self._fetch_models()
     except http_exceptions.RequestException: print "Unable to split column."
     return response
@@ -869,8 +892,9 @@ class Project():
   def remove_rows(self, facets=[], mode="row-based"):
     if TIMING: start = time()
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in facets], "mode": mode})}
       response = self.server.post("command/core/remove-rows?project={0}".format(self.id),
-                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in facets], "mode": mode})}})
+                                  **{"data": data})
       if TIMING: print "REFINE : removing rows took {0} seconds".format(time() - start)
     except http_exceptions.RequestException: print "Request command/core/remove-rows?project={0} failed.".format(
       self.id)
@@ -878,9 +902,9 @@ class Project():
   def compute_facets(self, mode="row-based"):
     if TIMING: start = time()
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode})}
       response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
-                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
-                                  .facets], "mode": mode})}})
+                                  **{"data": data})
       if TIMING: print "REFINE : computing facets took {0} seconds".format(time() - start)
       return [FacetComputation(**f) for f in response.json["facets"]]
     except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(
@@ -889,11 +913,9 @@ class Project():
   def test_facets(self, test_facets, mode="row-based"):
     if TIMING: start = time()
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in test_facets], "mode": mode})}
       response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
-                                  **{
-                                    "data": "engine={0}".format(
-                                      json.dumps({"facets": [f.refine_formatted() for f in test_facets],
-                                                  "mode": mode}))})
+                                  **{"data": data})
       if TIMING: print "REFINE : testing facets took {0} seconds".format(time() - start)
       return [FacetComputation(**f) for f in response.json["facets"]]
     except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed for test case.".format(
@@ -902,37 +924,36 @@ class Project():
 
   def flag_row(self, row_number, state="true", mode="row-based"):
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode})}
       response = self.server.post("command/core/annotate-one-row?flagged={2}&row={0}&project={1}".format(
-        row_number, self.id, state), **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
-      .facets], "mode": mode})}})
+        row_number, self.id, state), **{"data": data})
     except http_exceptions.RequestException: print "Unable to flag row {0}.".format(row_number)
 
   def flag_rows(self, state="true", mode="row-based"):
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode})}
       response = self.server.post("command/core/annotate-rows?flagged={1}&project={0}".format(self.id, state),
-                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
-                                  .facets], "mode": mode})}})
+                                  **{"data": data})
     except http_exceptions.RequestException: print "Unable to flag rows."
 
   def star_row(self, row_number, state="true", mode="row-based"):
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode})}
       response = self.server.post("command/core/annotate-one-row?starred={2}&row={0}&project={1}".format(
-        row_number, self.id, state), **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
-      .facets], "mode": mode})}})
+        row_number, self.id, state), **{"data": data})
     except http_exceptions.RequestException: print "Unable to star row {0}.".format(row_number)
 
   def star_rows(self, state="true", mode="row-based"):
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode})}
       response = self.server.post("command/core/annotate-rows?starred={1}&project={0}".format(self.id, state),
-                                  **{"data": {"engine": json.dumps({"facets": [f.refine_formatted() for f in self
-                                  .facets], "mode": mode})}})
+                                  **{"data": data})
     except http_exceptions.RequestException: print "Unable to star rows."
 
   def undo_redo(self, project_version=0, mode="row-based"):
     if TIMING: start = time()
-    data = {"engine":json.dumps({"facets": [f.refine_formatted() for f in self.facets],
-                                 "mode": mode})}
     try:
+      data = {"engine": json.dumps({"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode})}
       response = self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(
         project_version, self.id), **{"data": data})
     except http_exceptions.RequestException: print "Unable to undo/redo to version {0}.".format(project_version)
@@ -967,7 +988,7 @@ class SortCriterion(object):
     """
 
     if column_type == "string": self.case_sensitive = kwargs.get("case_sensitive", False)
-    self.column_name = quote(column_name)
+    self.column_name = RefineServer.simple_quote(column_name)
     self.column_type = column_type
     self.reverse = reverse
     self.blank_position = blank_position
@@ -982,7 +1003,7 @@ class SortCriterion(object):
   def __str__(self):
     return self.__unicode__()
 
-  def refine_formatted(self):
+  def refine_formatted_keys(self):
     key_formatted_repr = {}
     for k in self.__dict__.keys():
       new_key = "".join([c.capitalize() for c in k.split("_")])
@@ -993,8 +1014,8 @@ class SortCriterion(object):
 class Facet(object):
   def __init__(self, type, name, column_name, *args, **kwargs):
     self.type = kwargs.get("type", type)
-    self.name = quote(kwargs.get("name", name))
-    self.column_name = quote(kwargs.get("column_name", column_name))
+    self.name = kwargs.get("name", name)
+    self.column_name = kwargs.get("column_name", column_name)
     for k in kwargs.keys(): setattr(self, k, kwargs.get(k, None))
 
   def __unicode__(self):
@@ -1003,7 +1024,7 @@ class Facet(object):
   def __str__(self):
     return self.__unicode__()
 
-  def refine_formatted(self):
+  def refine_formatted_keys(self):
     key_formatted_repr = {}
     for k in self.__dict__.keys():
       if k == "lower_bound": key_formatted_repr["from"] = getattr(self, k)
@@ -1015,7 +1036,7 @@ class Facet(object):
 
   @staticmethod
   def prepare_expression(base_expression):
-    clean_expression = base_expression.replace("%", quote("%"))
+    clean_expression = base_expression
     if not match("^(?:grel)|(?:jython)|(?:clojure):", clean_expression):
       clean_expression = "grel:" + clean_expression
     if DEBUG:
@@ -1104,7 +1125,7 @@ class TextFacet(Facet):
     """
     Facet.__init__(self, "text", name, column_name)
     self.case_sensitive = kwargs.get("case_sensitive", case_sensitive)
-    self.query = (kwargs.get("query", query)).replace("%", quote("%"))
+    self.query = RefineServer.simple_quote(kwargs.get("query", query))
     self.mode = "text"
 
   def __unicode__(self):
@@ -1142,7 +1163,6 @@ class FacetComputation(object):
     """
     for k in kwargs.keys():
       quoted = kwargs.get(k, None)
-      if isinstance(quoted, str): quoted = quote(quoted)
       setattr(self, k, quoted)
 
   def __unicode__(self):
