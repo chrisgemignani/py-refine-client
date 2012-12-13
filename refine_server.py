@@ -1,7 +1,7 @@
 from requests import get as http_get, post as http_post, codes as http_codes, exceptions as http_exceptions
 from urllib import quote_plus
 from random import randint
-from re import match
+from re import match, search
 try: import simplejson as json
 except ImportError: import json
 from os.path import basename
@@ -102,11 +102,14 @@ class RefineServer(object):
         try:
           print(("RESPONSE : {0}").format(response.text))
         except Exception as e:
-          print e.message
+          print "DEBUG ERROR : {0}".format(e.message)
+      if response.status_code == 500:
+        raise Exception("{0} returned with 500.".format(action))
       return response
     except http_exceptions.RequestException as e:
-      if DEBUG: print "Request {0} failed. {1}".format(action, response)
-      raise
+      if DEBUG: print "Request {0} failed.".format(action)
+
+    return response
 
   def post(self, action, data=None, headers=None, files=None, **kwargs):
     if DEBUG:
@@ -123,11 +126,12 @@ class RefineServer(object):
         try:
           print(("RESPONSE : {0}").format(response.text))
         except Exception as e:
-          print e.message
+          print "DEBUG ERROR : {0}".format(e.message)
+      if response.status_code == 500:
+        raise Exception("{0} returned with 500.".format(action))
       return response
     except http_exceptions.RequestException as e:
-      if DEBUG: print "Request {0} failed. {1}".format(action, response)
-      raise
+      if DEBUG: print "Request {0} failed.".format(action)
 
   def destroy_all_projects(self):
     for p in self.projects:
@@ -516,17 +520,29 @@ class Project():
     if DEBUG:
       print "Initializing parser to {0}".format
 
+    response = ""
     try:
       response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
                                    "&jobID={0}&subCommand=initialize-parser-ui&format={1}".format(job_id,
                                                                                                   RefineServer.simple_quote(
                                                                                                     format))))
-      if DEBUG:
-        print "Initialize parser : {0}".format(response.text)
-      return response.json["options"]
-    except Exception:
-      print "Failed to initialize-parser-ui."
-      return dict()
+      # if file extension is xls but the file is actually xlsx an HTML error page is returned and, unseen,
+      # hangs the process in an infinite loop
+      return (mime_type, response.json["options"])
+    except Exception as e:
+      print "Failed to initialize-parser-ui. {0}".format(e.message)
+      if format == "binary/xls":
+        format = "text/xml/xlsx"
+        try:
+          response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
+                                       "&jobID={0}&subCommand=initialize-parser-ui&format={1}".format(job_id,
+                                                                                                      RefineServer.simple_quote(
+                                                                                                        format))))
+          return (format, response.json["options"])
+        except Exception as e:
+          print "Failed to initialize-parser-ui with fallback format. {0}".format(e.message)
+          # the process needs to stop here because it is likely trying to push an HTML prompt
+          raise Exception("Failed to initialize-parser-ui with fallback format. {0}".format(e.message))
 
 
   def _update_format(self, job_id, refine_mime_type, **kwargs):
@@ -702,7 +718,7 @@ class Project():
         print "Selected *sv separator {0}".format(kwargs["separator"])
 
     if TIMING: start = time()
-    presets = self._initialize_parser(job_id, mime_type)
+    (mime_type, presets) = self._initialize_parser(job_id, mime_type)
     if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
     presets.update(kwargs)
     if DEBUG:
@@ -772,7 +788,7 @@ class Project():
       print "Running with MIME Type : {0}".format(mime_type)
     if mime_type:
       if TIMING: start = time()
-      presets = self._initialize_parser(job_id, mime_type)
+      (mime_type, presets) = self._initialize_parser(job_id, mime_type)
       if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
     presets.update(kwargs)
     if DEBUG:
