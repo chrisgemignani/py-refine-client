@@ -100,7 +100,7 @@ class RefineServer(object):
       response = http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
       if DEBUG and action.find("get-rows") == -1:
         try:
-          print(("RESPONSE : {0}").format(response.text))
+          print(("RESPONSE : {0} {1}").format(response.status_code, response.text))
         except Exception as e:
           print "DEBUG ERROR : {0}".format(e.message)
       if response.status_code == 500:
@@ -124,7 +124,7 @@ class RefineServer(object):
                            **new_kwargs)
       if DEBUG and action.find("get-rows") == -1:
         try:
-          print(("RESPONSE : {0}").format(response.text))
+          print(("RESPONSE : {0} {1}").format(response.status_code, response.text))
         except Exception as e:
           print "DEBUG ERROR : {0}".format(e.message)
       if response.status_code == 500:
