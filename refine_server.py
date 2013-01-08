@@ -120,6 +120,7 @@ class RefineServer(object):
       new_kwargs = {"data": kwargs.get("data", data),
                     "files": kwargs.get("files", files),
                     "headers": kwargs.get("headers", headers)}
+      new_kwargs.update(kwargs)
       response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action),
                            **new_kwargs)
       if DEBUG and action.find("get-rows") == -1:
@@ -307,10 +308,8 @@ class Project():
 
   def destroy(self):
     if self.id:
-      data = {"project": self.id}
-      response = self.server.post("command/core/delete-project", **{"data": json.dumps(data)})
-      if response and response.json["code"] != "ok":
-        print "Request command/core/delete-project failed."# placeholder - do something if it fails?
+      response = self.server.post("command/core/delete-project", **{"data": "project={0}".format(self.id),
+                                                                    "timeout":0.01})
 
   def _fetch_new_job(self):
     response = None
