@@ -82,7 +82,7 @@ class RefineServer(object):
   Docstring
   """
 
-  def __init__(self, protocol="http", host="127.0.0.1", port="3333", *args, **kwargs):
+  def __init__(self, protocol="http", host="localhost", port="3333", *args, **kwargs):
     self.protocol = kwargs.get("protocol", protocol)
     self.host = kwargs.get("host", host)
     self.port = kwargs.get("port", port)
