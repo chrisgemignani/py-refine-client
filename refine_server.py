@@ -95,7 +95,7 @@ class RefineServer(object):
 
   def get(self, action):
     if DEBUG:
-      print "REQUEST URL : {0}".format(str(action))
+      print "REQUEST URL : {0}/{1}".format(str(self),str(action))
     try:
       response = http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action))
       if DEBUG and action.find("get-rows") == -1:
@@ -117,9 +117,10 @@ class RefineServer(object):
 
   def post(self, action, data=None, headers=None, files=None, **kwargs):
     if DEBUG:
-      print "REQUEST URL : {0}\nDATA : {1}\nHEADERS : {2}".format(str(action),
+      print "REQUEST URL : {3}/{0}\nDATA : {1}\nHEADERS : {2}".format(str(action),
                                                                   str(kwargs.get("data", data)),
-                                                                  str(kwargs.get("headers", headers)))
+                                                                  str(kwargs.get("headers", headers)),
+                                                                  str(self))
     try:
       new_kwargs = {"data": kwargs.get("data", data),
                     "files": kwargs.get("files", files),
@@ -315,7 +316,7 @@ class Project():
 
   def destroy(self):
     if self.id:
-       self.server.post("command/core/delete-project", **{"data": "project={0}".format(self.id)})
+       self.server.post("command/core/delete-project", **{"data": {"project":self.id}})
 
   def _fetch_new_job(self):
     response = None
