@@ -109,7 +109,11 @@ class RefineServer(object):
     except http_exceptions.RequestException as e:
       if DEBUG: print "Request {0} failed.".format(action)
 
-    return response
+    try:
+      return response
+    except Exception as e:
+      print e.message
+	
 
   def post(self, action, data=None, headers=None, files=None, **kwargs):
     if DEBUG:
@@ -130,7 +134,10 @@ class RefineServer(object):
           print "DEBUG ERROR : {0}".format(e.message)
       if response.status_code == 500:
         raise Exception("{0} returned with 500.".format(action))
-      return response
+      try:
+        return response
+      except Exception as e:
+        print "NO RESPONSE FROM ACTION {0} : {1}".format(action, e.message)
     except http_exceptions.RequestException as e:
       if DEBUG: print "Request {0} failed.".format(action)
 
@@ -308,8 +315,7 @@ class Project():
 
   def destroy(self):
     if self.id:
-      response = self.server.post("command/core/delete-project", **{"data": "project={0}".format(self.id),
-                                                                    "timeout":0.01})
+       self.server.post("command/core/delete-project", **{"data": "project={0}".format(self.id)})
 
   def _fetch_new_job(self):
     response = None
