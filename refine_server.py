@@ -113,14 +113,14 @@ class RefineServer(object):
       return response
     except Exception as e:
       print e.message
-	
+
 
   def post(self, action, data=None, headers=None, files=None, **kwargs):
     if DEBUG:
       print "REQUEST URL : {3}/{0}\nDATA : {1}\nHEADERS : {2}".format(str(action),
-                                                                  str(kwargs.get("data", data)),
-                                                                  str(kwargs.get("headers", headers)),
-                                                                  str(self))
+                                                                      str(kwargs.get("data", data)),
+                                                                      str(kwargs.get("headers", headers)),
+                                                                      str(self))
     try:
       new_kwargs = {"data": kwargs.get("data", data),
                     "files": kwargs.get("files", files),
@@ -316,7 +316,7 @@ class Project():
 
   def destroy(self):
     if self.id:
-       self.server.post("command/core/delete-project", **{"data": {"project":self.id}})
+      self.server.post("command/core/delete-project", **{"data": {"project":self.id}})
 
   def _fetch_new_job(self):
     response = None
@@ -489,7 +489,7 @@ class Project():
                                                                 response.json["job"]["config"]["error"],
                                                                 response.json["job"]["config"]["errorDetails"]))
       else:
-        if response.json["job"]["config"]["state"] == "error":
+        if response.json["job"]["config"].get("state", None) == "error":
           print("Request command/core/get-importing-job-status?"
                 "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
                                                                   response.json["job"]["config"]["error"],
@@ -696,7 +696,7 @@ class Project():
     response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
                                  "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files": files})
     if response and response.json:
-      print "Failed to load data source {0}. ".format(path) + response.json # error message
+      print "Failed to load data source {0}. ".format(path) + response.text # error message
     if TIMING: print "REFINE : load raw data took {0} seconds".format(time() - start)
 
     if TIMING: start = time()
