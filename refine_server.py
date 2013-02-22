@@ -899,18 +899,23 @@ class Project():
     response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
                                  "&jobID={0}&subCommand=load-raw-data".format(job_id)),
                                 **{"data": data, "headers": headers})
-
+    # should have no response - quick indicator of failure - occasionally happens without cause - force retry
     if response:
-      try:
-        json_response = response.json()
-        if json_response:
-          try:
-            print "Failed to load data source {0}.\n{1}".format(path, response.text[0:300]) # error message
-          except Exception as e:
-            print "Failed to display error message in _create_project_from_file! {0}".format(e.message)
-      except Exception as e:
-        print "Failed to load JSON in response to load-raw-data request - but there should be no JSON if this request" \
-              " is successful so we are probably okay. {0}".format(e.message)
+      sleep(1)
+      response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
+                                   "&jobID={0}&subCommand=load-raw-data".format(job_id)),
+                                  **{"data": data, "headers": headers})
+      if response:
+        try:
+          json_response = response.json()
+          if json_response:
+            try:
+              print "Failed to load data source {0}.\n{1}".format(path, response.text[0:300]) # error message
+            except Exception as e:
+              print "Failed to display error message in _create_project_from_file! {0}".format(e.message)
+        except Exception as e:
+          print "Failed to load JSON in response to load-raw-data request - but there should be no JSON if this request" \
+                " is successful so we are probably okay. {0}".format(e.message)
 
     if TIMING: print "REFINE : load raw data took {0} seconds".format(time() - start)
 
@@ -964,16 +969,24 @@ class Project():
         content_line = f.readline()
 
     if match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|,)+$", content_line):
-      if local_path: cleanup(local_path)
+      try:
+        cleanup(local_path)
+      except Exception as e: print "Could not destroy tmp file! {0}".format(e)
       return ","
     elif match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|\t)+$", content_line):
-      if local_path: cleanup(local_path)
+      try:
+        cleanup(local_path)
+      except Exception as e: print "Could not destroy tmp file! {0}".format(e)
       return u"\\t"
     elif match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|;)+$", content_line):
-      if local_path: cleanup(local_path)
+      try:
+        cleanup(local_path)
+      except Exception as e: print "Could not destroy tmp file! {0}".format(e)
       return ";"
     else:
-      if local_path: cleanup(local_path)
+      try:
+        cleanup(local_path)
+      except Exception as e: print "Could not destroy tmp file! {0}".format(e)
       return "," # and hope for the best
 
 
