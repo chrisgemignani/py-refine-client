@@ -124,8 +124,8 @@ class RefineServer(object):
     def post(self, action, data=None, headers=None, files=None, stream=False, **kwargs):
         if DEBUG:
             print "REQUEST URL (POST) : {3}/{0}\nDATA : {1}\nHEADERS : {2}".format(str(action),
-                                                                                   str(kwargs.get("data", str(data))),
-                                                                                   str(kwargs.get("headers", str(headers))),
+                                                                                   str(kwargs.get("data", data)),
+                                                                                   str(kwargs.get("headers", headers)),
                                                                                    str(self))
         try:
             new_kwargs = {"data": kwargs.get("data", data),
@@ -134,9 +134,10 @@ class RefineServer(object):
                           "stream": kwargs.get("stream", stream)}
             new_kwargs.update(kwargs)
             if new_kwargs["data"]:
-                for k in new_kwargs["data"].keys():
-                    if isinstance(new_kwargs["data"][k], dict):
-                        new_kwargs["data"][k] = json.dumps(new_kwargs["data"][k])
+                if isinstance(new_kwargs["data"],dict):
+                    for k in new_kwargs["data"].keys():
+                        if isinstance(new_kwargs["data"][k], dict):
+                            new_kwargs["data"][k] = json.dumps(new_kwargs["data"][k])
                 if DEBUG:
                     print "MODIFIED DATA {0}".format(new_kwargs["data"])
             response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action),
@@ -152,7 +153,6 @@ class RefineServer(object):
                     raise Exception("{0} returned with 500.".format(action))
                 else:
                     return response
-
             else:
                 print "No response returned from {0}".format(action)
 
