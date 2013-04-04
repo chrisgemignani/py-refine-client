@@ -1113,12 +1113,12 @@ class Project():
         """
         if TIMING: start = time()
         try:
-            data = {"engine": {"facets": [f.refine_formatted_keys() for f in facets],
+            data = {"engine":{"facets": [f.refine_formatted_keys() for f in facets],
                                "mode": mode},
-                    "row": row_index,
-                    "cell": column_index,
-                    "type": "{0}".format(type),
-                    "value": "{0}".format(new_value)}
+                    "row":row_index,
+                    "cell":column_index,
+                    "type":"{0}".format(type),
+                    "value":"{0}".format(new_value)}
             response = self.server.post("command/core/edit-one-cell?project={0}".format(self.id), **{"data":data})
         except Exception as e:
             print "Request command/core/edit-one-cell?project={0} failed. {1}".format(self.id, e.message)
@@ -1133,9 +1133,9 @@ class Project():
         try:
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in facets],
                                "mode": mode},
-                    "expression":Facet.prepare_expression(expression),
+                    "expression":expression,
                     "columnName":column_name,
-                    "edits":edits}
+                    "edits":json.dumps(edits)}
             response = self.server.post("command/core/mass-edit?project={0}".format(self.id), **{"data":data})
         except Exception as e:
             print "Request command/core/mass-edit?project={0} failed. {1}".format(self.id, e.message)
