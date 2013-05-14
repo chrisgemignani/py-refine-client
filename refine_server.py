@@ -20,6 +20,24 @@ TMP_DIR = "/tmp/"
 if TIMING:
     from time import time
 
+
+class Logging(object):
+    @staticmethod
+    def log(message):
+        try:
+            with open("{0}refine.log".format(TMP_DIR),"a") as f:
+                f.write("{0}\n".format(message))
+        except Exception as e:
+            print "Could not write \"{0}\" to log file because {1}".format(message,e)
+
+
+class RefineHungOnFileLoadException(Exception):
+
+    def __init__(self, message):
+
+        Exception.__init__(self, message)
+
+
 class RefineFormat(object):
     """
     Docstring
@@ -85,10 +103,11 @@ class RefineServer(object):
     Docstring
     """
 
-    def __init__(self, protocol="http", host="localhost", port="3333", *args, **kwargs):
+    def __init__(self, protocol="http", host="localhost", port="3333", auth=None, *args, **kwargs):
         self.protocol = kwargs.get("protocol", protocol)
         self.host = kwargs.get("host", host)
         self.port = kwargs.get("port", port)
+        self.auth = kwargs.get("auth", auth)
 
     def __unicode__(self):
         return "{0}://{1}:{2}".format(self.protocol, self.host, self.port)
@@ -98,16 +117,19 @@ class RefineServer(object):
 
     def get(self, action, stream=False):
         if DEBUG:
-            print "REQUEST URL (GET) : {0}/{1}".format(str(self),str(action))
+            Logging.log("REQUEST URL (GET) : {0}/{1}".format(str(self),str(action)))
         try:
-            response = http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), stream=stream)
+            if self.auth:
+                response = http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action),auth=self.auth,tream=stream)
+            else:
+                response = http_get("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action),stream=stream)
             if response:
 
                 if DEBUG and action.find("get-rows") == -1 and action.find("export-rows") == -1:
                     try:
-                        print(("RESPONSE : {0} {1}").format(response.status_code, unicode(response.text)))
+                        Logging.log(("RESPONSE : {0} {1}").format(response.status_code, unicode(response.text)))
                     except Exception as e:
-                        print "DEBUG ERROR : {0}".format(e)
+                        Logging.log("DEBUG ERROR : {0}".format(e))
 
                 if response.status_code == 500:
                     raise Exception("{0} returned with 500.".format(action))
@@ -115,18 +137,15 @@ class RefineServer(object):
                     return response
 
             else:
-                print "No response returned from {0}".format(action)
+                Logging.log("No response returned from {0}".format(action))
 
         except http_exceptions.RequestException as e:
-            print "Request {0} failed. {1}".format(action, e)
+            Logging.log("Request {0} failed. {1}".format(action, e))
 
 
     def post(self, action, data=None, headers=None, files=None, stream=False, **kwargs):
         if DEBUG:
-            print "REQUEST URL (POST) : {3}/{0}\nDATA : {1}\nHEADERS : {2}".format(str(action),
-                                                                                   str(kwargs.get("data", data)),
-                                                                                   str(kwargs.get("headers", headers)),
-                                                                                   str(self))
+            Logging.log("REQUEST URL (POST) : {3}/{0}\nDATA : {1}\nHEADERS : {2}\nFILES : {4}".format(str(action), str(kwargs.get("data", data)), str(kwargs.get("headers", headers)), str(self), str(kwargs.get("files",files))))
         try:
             new_kwargs = {"data": kwargs.get("data", data),
                           "files": kwargs.get("files", files),
@@ -139,31 +158,34 @@ class RefineServer(object):
                         if isinstance(new_kwargs["data"][k], dict):
                             new_kwargs["data"][k] = json.dumps(new_kwargs["data"][k])
                 if DEBUG:
-                    print "MODIFIED DATA {0}".format(new_kwargs["data"])
-            response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action),
-                                 **new_kwargs)
+                    Logging.log("MODIFIED DATA {0}".format(new_kwargs["data"]))
+            if self.auth:
+                response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action),auth=self.auth, **new_kwargs)
+            else:
+                response = http_post("{0}://{1}:{2}/{3}".format(self.protocol, self.host, self.port, action), **new_kwargs)
             if response:
                 if DEBUG and action.find("get-rows") == -1 and action.find("export-rows") == -1:
                     try:
-                        print(("RESPONSE : {0} {1}").format(response.status_code, unicode(response.text)))
+                        Logging.log(("RESPONSE : {0} {1}").format(response.status_code, unicode(response.text)))
                     except Exception as e:
-                        print "DEBUG ERROR : {0}".format(e)
+                        Logging.log("DEBUG ERROR : {0}".format(e))
 
                 if response.status_code == 500:
                     raise Exception("{0} returned with 500.".format(action))
                 else:
                     return response
             else:
-                print "No response returned from {0}".format(action)
+                Logging.log("No response returned from {0}".format(action))
 
         except http_exceptions.RequestException as e:
-            print "Request {0} failed. {1}".format(action, e)
+            Logging.log("Request {0} failed. {1}".format(action, e))
+            pass
 
 
     def destroy_all_projects(self):
         for p in self.projects:
             if DEBUG:
-                print "Destroying {0}".format(p.id)
+                Logging.log("Destroying {0}".format(p.id))
             p.destroy()
 
     @property
@@ -185,7 +207,7 @@ class RefineServer(object):
                 raise Exception("Failed to retrieve projects. {0}".format(e.message))
             return [Project(id=pid) for pid in json_response.get("projects",{}).keys()]
         else:
-            print "Request command/core/get-all-project-metadata failed."
+            Logging.log("Request command/core/get-all-project-metadata failed.")
 
     @property
     def configuration(self):
@@ -197,7 +219,7 @@ class RefineServer(object):
             except Exception as e:
                 raise Exception("Failed to retrieve JSON for get-importing-configuration request. {0}".format(e.message))
         else:
-            print "Request command/core/get-importing-configuration failed."
+            Logging.log("Request command/core/get-importing-configuration failed.")
 
     @staticmethod
     def simple_quote(unsafe):
@@ -326,29 +348,43 @@ class Project():
         """
 
         self.server = server
-        self.id = kwargs.get("id", id)
         self._facets = []
         self._sort_criteria = []
         self._columns = []
         self.row_set = None
+        self.id = kwargs.get("id", id)
+        path = kwargs.get("path", path)
+        name = kwargs.get("name", name)
+        url = kwargs.get("url", url)
+
         if not self.id:
             if TIMING: start = time()
             job_id = self._fetch_new_job()
-            if TIMING: print "REFINE : fetching new job ID took {0}".format(time() - start)
-            if path or "path" in kwargs:
-                p = kwargs.get("path",path)
+            if TIMING:
+                Logging.log("REFINE : fetching new job ID took {0}".format(time() - start))
+            if path:
                 try:
-                    open(p, "r")
-                    self._create_project_from_file(kwargs.get("path", path), job_id, kwargs.get("name", name), **kwargs)
+                    open(path, "r")
                 except Exception as e:
-                    print "Failed to retrieve local path {0}. Attempting to load from url.".format(p)
-                    if url or "url" in kwargs:
-                        self._create_project_from_url(kwargs.get("url", url), job_id, kwargs.get("name", name), **kwargs)
-                    else:
-                        raise Exception("Unable to retrieve {0} and no url available for retrieval.".format(p))
+                    Logging.log("Failed to retrieve local path {0} {1}".format(path,e))
 
-            elif url or "url" in kwargs:
-                self._create_project_from_url(kwargs.get("url", url), job_id, kwargs.get("name", name), **kwargs)
+                    if url:
+                        try:
+                            self._create_project_from_url(url, job_id, name, **kwargs)
+                        except RefineHungOnFileLoadException:
+                            raise
+                    else:
+                        raise Exception("Unable to retrieve {0} and no url available for retrieval. {1}".format(path, e))
+                try:
+                    self._create_project_from_file(path, job_id, name, **kwargs)
+                except RefineHungOnFileLoadException:
+                    raise
+
+            elif url:
+                try:
+                    self._create_project_from_url(url, job_id, name, **kwargs)
+                except RefineHungOnFileLoadException:
+                    raise
 
     def __unicode__(self):
         return "Project ID {0} using server at {1}".format(self.id, unicode(self.server))
@@ -358,12 +394,13 @@ class Project():
 
     def destroy(self):
         if self.id:
-            self.server.post("command/core/delete-project", **{"data": {"project":self.id}, "timeout":0.1})
+            self.server.post("command/core/delete-project", timeout=0.25, **{"data": {"project":self.id}})
 
     def _fetch_new_job(self):
         response = None
         try: response = self.server.post("command/core/create-importing-job")
-        except http_exceptions.RequestException: print "Request command/core/create-importing-job failed."
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/create-importing-job failed.")
         if response:
             try:
                 json_response = response.json()
@@ -372,9 +409,10 @@ class Project():
             return json_response.get("jobID", None)
 
     def _cancel_import_job(self, job_id):
-        try: return self.server.post("command/core/cancel-importing-job?jobID={0}".format(job_id))
-        except http_exceptions.RequestException: print("Request command/core/cancel-importing-job?"
-                                                       "jobID={0} failed.".format(job_id))
+        try:
+            return self.server.post("command/core/cancel-importing-job?jobID={0}".format(job_id))
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/cancel-importing-job?jobID={0} failed.".format(job_id))
 
     @property
     def facets(self):
@@ -397,10 +435,7 @@ class Project():
                                                                                 RefineServer.simple_quote(new_name),
                                                                                 self.id))
         except http_exceptions.RequestException:
-            print("Request /command/core/rename-column?oldColumnName={0}"
-                  "&newColumnName={1}&project={2}".format(RefineServer.simple_quote(old_name),
-                                                          RefineServer.simple_quote(new_name),
-                                                          self.id))
+            Logging.log("Request /command/core/rename-column?oldColumnName={0}&newColumnName={1}&project={2}".format(RefineServer.simple_quote(old_name), RefineServer.simple_quote(new_name), self.id))
 
     @property
     def sort_criteria(self):
@@ -415,8 +450,8 @@ class Project():
     @property
     def history(self):
         try: response = self.server.get("command/core/get-history?project={0}".format(self.id))
-        except http_exceptions.RequestException: print "Request command/core/get-history?project={0} failed.".format(
-            self.id)
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/get-history?project={0} failed.".format(self.id))
         if response:
             try:
                 json_response = response.json()
@@ -429,8 +464,8 @@ class Project():
     @property
     def processes(self):
         try: response = self.server.get("command/core/get-processes?project={0}".format(self.id))
-        except http_exceptions.RequestException: print "Request command/core/get-processes?project={0} failed.".format(
-            self.id)
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/get-processes?project={0} failed.".format(self.id))
         if response:
             try:
                 json_response = response.json()
@@ -442,8 +477,8 @@ class Project():
     @property
     def metadata(self):
         try: return self.server.get("command/core/get-project-metadata?project={0}".format(self.id))
-        except http_exceptions.RequestException: print "Request command/core/get-project-metadata?project={0}".format(
-            self.id)
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/get-project-metadata?project={0}".format(self.id))
 
     @property
     def column_names(self):
@@ -454,7 +489,7 @@ class Project():
         self._fetch_models()
         return self._columns
 
-    def rows(self, job_id=None, offset=0, limit=500000, mode="row-based"):
+    def rows(self, job_id=None, offset=0, limit=1000, mode="row-based"):
         if TIMING: start = time()
         try:
             if job_id:
@@ -470,14 +505,15 @@ class Project():
                         .sort_criteria]},
                         "callback": callback}
                 if DEBUG:
-                    print "DATA {0}".format(data)
+                    Logging.log("DATA {0}".format(data))
                 response = self.server.post(("command/core/get-rows?project={0}&start={1}&limit={2}"
                                              "&callback={3}".format(self.id, offset, quote(str(limit)), callback)),
                                             **{"data": data, "stream": True})
         except Exception as e:
-            print "Unable to retrieve rows. {0}".format(e)
+            Logging.log("Unable to retrieve rows. {0}".format(e))
 
-        if TIMING: print "REFINE : getting rows took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : getting rows took {0} seconds".format(time() - start))
 
         if response:
             response = json.loads(response.text[19:-1])
@@ -502,11 +538,13 @@ class Project():
         try:
             response = self.server.post("command/core/export-rows/{0}".format(filename),
                                         **{"data": data, "stream": stream})
-        except http_exceptions.RequestException: print "Failed to export rows."
+        except http_exceptions.RequestException:
+            Logging.log("Failed to export rows.")
         local_path = '{0}{1}.json'.format(TMP_DIR, "{0}".format("".join(choice(letters+digits) for _ in xrange(20))))
         with open(local_path, 'wb') as rows_file:
             rows_file.write(response.content)
-        if TIMING: print "REFINE : exporting took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : exporting took {0} seconds".format(time() - start))
         return local_path
 
     @staticmethod
@@ -515,7 +553,7 @@ class Project():
         if not match("^(?:grel)|(?:jython)|(?:clojure):", clean_expression):
             clean_expression = "grel:" + clean_expression
         if DEBUG:
-            print clean_expression
+            Logging.log(clean_expression)
         return clean_expression
 
     def transform_column(self, column_name, expression, on_error="keep-original", repeat=False, repeat_count=1, *args, **kwargs):
@@ -534,14 +572,15 @@ class Project():
                     kwargs.get("repeat_count", repeat_count),
                     self.id))
         except http_exceptions.RequestException:
-            print "Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
+            Logging.log("Request command/core/text-transform?columnName={0}&expression={1}&onError={2}&repeat={3}&repeatCount={4}&project={5}".format(
                 RefineServer.simple_quote(column_name),
                 Project.prepare_qs_expression(expression),
                 kwargs.get("on_error", on_error),
                 kwargs.get("repeat", repeat),
                 kwargs.get("repeat_count", repeat_count),
-                self.id)
-        if TIMING: print "REFINE : transforming column took {0} seconds".format(time() - start)
+                self.id))
+        if TIMING:
+            Logging.log("REFINE : transforming column took {0} seconds".format(time() - start))
 
     def _get_import_job_status(self, job_id):
 
@@ -559,20 +598,8 @@ class Project():
                     .format(e
                     .message))
 
-            if json_response.get("status") == "error":
-                try:
-                    raise Exception("Request command/core/get-importing-job-status?"
-                                    "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
-                                                                                      json_response["job"]["config"].get("error",
-                                                                                                                         "[no message]"),
-                                                                                      json_response["job"]["config"].get("errorDetails",
-                                                                                                                         "[no details]")))
-                except Exception as e:
-                    raise Exception("Unable to print result of get-importing-job-status but it has failed [1] :".format(e))
-
-            else:
-
-                if json_response["job"]["config"].get("state", None) == "error":
+            if json_response:
+                if json_response.get("status") == "error":
                     try:
                         raise Exception("Request command/core/get-importing-job-status?"
                                         "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
@@ -581,35 +608,60 @@ class Project():
                                                                                           json_response["job"]["config"].get("errorDetails",
                                                                                                                              "[no details]")))
                     except Exception as e:
-                        raise Exception("Unable to print result of get-importing-job-status but it has failed [2] : {0}".format(e))
+                        raise Exception("Unable to print result of get-importing-job-status but it has failed [1] :".format(e))
 
-                job_status = ImportJobDetails(**json_response.get("job").get("config"))
-                while not (job_status.state == "ready" or job_status.state == "created-project"):
+                else:
+                    if not json_response["job"]["config"]:
 
-                    sleep(0.25)
+                        raise Exception("Request command/core/get-importing-job-status returns a null config indicating that load-raw-data failed!")
 
-                    try:
-                        response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
+                    if json_response["job"]["config"].get("state", None) == "error":
                         try:
-                            json_response = response.json()
+                            raise Exception("Request command/core/get-importing-job-status?"
+                                            "jobID={0} returned with error.\n{1}\n{2}".format(job_id,
+                                                                                              json_response["job"]["config"].get("error",
+                                                                                                                                 "[no message]"),
+                                                                                              json_response["job"]["config"].get("errorDetails",
+                                                                                                                                 "[no details]")))
                         except Exception as e:
-                            if response.text:
-                                raise Exception("Failed to retrieve JSON from get-importing-job-status. {0} : {1}".format(e.message,
-                                                                                                                          response.text))
-                            else:
-                                raise Exception("Failed to retrieve JSON from get-importing-job-status. {0} : Failed to load response text."
-                                .format(e.message))
-                        job_status = ImportJobDetails(**json_response.get("job").get("config"))
+                            raise Exception("Unable to print result of get-importing-job-status but it has failed [2] : {0}".format(e))
 
-                    except Exception as e:
-                        print "Request command/core/get-importing-job-status?jobID={0} failed with {1}.".format(job_id,
-                                                                                                                e.message)
-                        break
-                if job_status.state == "created-project":
-                    self.id = json_response["job"]["config"]["projectID"]
+                    job_status = ImportJobDetails(**json_response.get("job").get("config"))
+                    nnpct = 0
+                    poll_interval = 0.25 # seconds
+                    max_wait_time = 10 # seconds
+                    while not (job_status.state == "ready" or job_status.state == "created-project"):
+
+                        sleep(poll_interval)
+
+                        try:
+                            response = self.server.post("command/core/get-importing-job-status?jobID={0}".format(job_id))
+                            try:
+                                json_response = response.json()
+                            except Exception as e:
+                                if response.text:
+                                    raise Exception("Failed to retrieve JSON from get-importing-job-status. {0} : {1}".format(e.message,
+                                                                                                                              response.text))
+                                else:
+                                    raise Exception("Failed to retrieve JSON from get-importing-job-status. {0} : Failed to load response text."
+                                    .format(e.message))
+                            job_status = ImportJobDetails(**json_response.get("job").get("config"))
+                            if job_status.progress and job_status.progress.get("percent",0) == 99:
+                                nnpct += 1
+                            if nnpct > int(round(max_wait_time/poll_interval)):
+                                # cleanup
+                                self._cancel_import_job(self.id)
+                                # let outside code know that it needs to retry
+                                raise RefineHungOnFileLoadException("Refine hung at 99% load-raw-data. Retry.")
+
+                        except Exception as e:
+                            Logging.log("Request command/core/get-importing-job-status?jobID={0} failed with {1}.".format(job_id, e.message))
+                            break
+                    if job_status.state == "created-project":
+                        self.id = json_response["job"]["config"]["projectID"]
 
         else:
-            print "No response to get-importing-job-status"
+            Logging.log("No response to get-importing-job-status")
             raise Exception # odd scenario
 
         return job_status
@@ -619,7 +671,7 @@ class Project():
 
         format = mime_type
         if DEBUG:
-            print "Initialize parser received : {0}".format(mime_type)
+            Logging.log("Initialize parser received : {0}".format(mime_type))
 
         if mime_type not in [f.name for f in self.server.configuration.formats]:
             format = self.server.configuration.mime_types[mime_type]
@@ -627,7 +679,7 @@ class Project():
         if not format: format = DEFAULT_MIME_TYPE # set a default
 
         if DEBUG:
-            print "Initializing parser to {0}".format(format)
+            Logging.log("Initializing parser to {0}".format(format))
 
         response = ""
         try:
@@ -644,7 +696,7 @@ class Project():
                 raise Exception("Failed to retrieve JSON in response to initialize-parser-ui request. {0}".format(e.message))
 
         except Exception as e:
-            print "Failed to initialize-parser-ui. {0}".format(e.message)
+            Logging.log("Failed to initialize-parser-ui. {0}".format(e.message))
             if format == "binary/xls":
                 format = "text/xml/xlsx"
                 try:
@@ -660,7 +712,7 @@ class Project():
                         .message))
 
                 except Exception as e:
-                    print "Failed to initialize-parser-ui with fallback format. {0}".format(e.message)
+                    Logging.log("Failed to initialize-parser-ui with fallback format. {0}".format(e.message))
                     # the process needs to stop here because it is likely trying to push an HTML prompt
                     raise Exception("Failed to initialize-parser-ui with fallback format. {0}".format(e.message))
 
@@ -770,7 +822,8 @@ class Project():
             return self.server.post(("command/core/importing-controller?controller=core/default-importing-controller"
                                      "&jobID={0}&subCommand=update-format-and-options".format(job_id)),
                                     **{"data": data, "headers": headers})
-        except Exception: print "Error updating format."
+        except Exception:
+            Logging.log("Error updating format.")
 
 
     def _fetch_models(self, job_id=None):
@@ -787,12 +840,13 @@ class Project():
                 raise Exception("Failed to load JSON in response to get-models request. {0}".format(e.message))
 
         except Exception as e:
-            print "Unable to retrieve model definitions. {0}".format(e.message)
+            Logging.log("Unable to retrieve model definitions. {0}".format(e.message))
 
         if json_response.get("columnModel", None) and json_response.get("columnModel").get("columns", None):
             self._columns = [ColumnDefinition(**c) for c in json_response["columnModel"].get("columns", [])]
             self._columns.sort(key=lambda i: i.cell_index)
-        if DEBUG: print self._columns
+        if DEBUG:
+            Logging.log(self._columns)
 
 
     def _create(self, job_id, mime_type, name="default", **kwargs):
@@ -809,41 +863,49 @@ class Project():
             # after create-project it shows the projectID and is the only way of discovering this value given a job id
             job_status = self._get_import_job_status(job_id)
             return response
+        except RefineHungOnFileLoadException: raise
         except http_exceptions.RequestException: raise
 
 
     def _create_project_from_file(self, path, job_id, name, **kwargs):
 
-        files = {"file": (basename(path), open(path, "rb"))}
+        try:
+            files = {"file": (basename(path), open(path, "rb"))}
+        except Exception as e:
+            Logging.log("Could not open file {0} {1}".format(path, e))
+            pass
 
         if TIMING: start = time()
-        response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
-                                     "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files": files})
+
+        response = self.server.post("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=load-raw-data".format(job_id), **{"files":files})
+
         if response:
             # should not return a response - occasionally fails for no reason citing non-existent job id - force retry
             sleep(1)
-            response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller"
-                                         "&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files": files})
+            response = self.server.post(("command/core/importing-controller?controller=core%2Fdefault-importing-controller&jobID={0}&subCommand=load-raw-data".format(job_id)), **{"files": files})
             try:
                 json_response = response.json()
                 if json_response:
                     try:
-                        print "Failed to load data source {0}.\n{1}".format(path, response.json()) # error message
+                        Logging.log("Failed to load data source {0}.\n{1}".format(path, response.json())) # error message
                     except Exception as e:
-                        print "Failed to load data source {0}! Failed to display error message in _create_project_from_file! {1}" \
-                            .format(path, e)
+                        Logging.log("Failed to load data source {0}! Failed to display error message in _create_project_from_file! {1}" \
+                            .format(path, e))
             except Exception as e:
-                print "Failed to load JSON in response to load-raw-data request - but there should be no JSON if this request" \
-                      " is successful so we are probably okay. {0}".format(e.message)
+                Logging.log("Failed to load JSON in response to load-raw-data request - but there should be no JSON if this request" \
+                            " is successful so we are probably okay. {0}".format(e.message))
 
-        if TIMING: print "REFINE : load raw data took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : load raw data took {0} seconds".format(time() - start))
 
         if TIMING: start = time()
-        job_status = self._get_import_job_status(job_id) # polls for import completion
-        if TIMING: print "REFINE : polling for status took {0} seconds".format(time() - start)
+        try: job_status = self._get_import_job_status(job_id) # polls for import completion
+        except RefineHungOnFileLoadException: raise
+        if TIMING:
+            Logging.log("REFINE : polling for status took {0} seconds".format(time() - start))
 
         if DEBUG:
-            print job_status
+            Logging.log(job_status)
 
         mime_type = job_status.ranked_formats[0]
         if mime_type == "text/line-based" or mime_type == "text/line-based/fixed-width" and kwargs.has_key("separator"):
@@ -853,51 +915,60 @@ class Project():
         if mime_type=="text/json" and not kwargs.has_key("record_path") and not kwargs.has_key("recordPath"):
             if TIMING: start = time()
             kwargs["recordPath"] = Project.identify_json_record_path(None, path)
-            if TIMING: print "REFINE : identifying JSON path took {0} seconds".format(time() - start)
+            if TIMING:
+                Logging.log("REFINE : identifying JSON path took {0} seconds".format(time() - start))
 
         elif mime_type=="text/line-based/*sv" and not kwargs.has_key("separator"):
             if TIMING: start = time()
             kwargs["separator"]=Project.sv_separator(None, path)
-            if TIMING: print "REFINE : identifying *SV separator took {0} seconds".format(time() - start)
+            if TIMING:
+                Logging.log("REFINE : identifying *SV separator took {0} seconds".format(time() - start))
             if DEBUG:
-                print "Selected *sv separator {0}".format(str(kwargs["separator"]))
+                Logging.log("Selected *sv separator {0}".format(str(kwargs["separator"])))
 
         if TIMING: start = time()
         (mime_type, presets) = self._initialize_parser(job_id, mime_type)
-        if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : initializing parser took {0} seconds".format(time() - start))
         presets.update(kwargs)
         if DEBUG:
-            print "Presets : {0}".format(str(presets))
+            Logging.log("Presets : {0}".format(str(presets)))
         if TIMING: start = time()
         update_response = self._update_format(job_id, mime_type, **presets)
-        if TIMING: print "REFINE : updating format took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : updating format took {0} seconds".format(time() - start))
 
         if TIMING: start = time()
         self._fetch_models(job_id)
-        if TIMING: print "REFINE : fetching models took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : fetching models took {0} seconds".format(time() - start))
 
         if TIMING: start = time()
-        self._create(job_id, mime_type, name, **kwargs)
-        if TIMING: print "REFINE : creating project took {0} seconds".format(time() - start)
+        try:
+            self._create(job_id, mime_type, name, **kwargs)
+        except RefineHungOnFileLoadException as e:
+            raise
+        if TIMING:
+            Logging.log("REFINE : creating project took {0} seconds".format(time() - start))
 
 
     def _create_project_from_url(self, url, job_id, name, **kwargs):
 
         if DEBUG:
-            print "Fetching {0}".format(url)
+            Logging.log("Fetching {0}".format(url))
 
         mime_type = http_get(url).headers["content-type"]
 
         if mime_type.find(";") > 0:
             mime_type = mime_type[0:mime_type.find(";")]
         if DEBUG:
-            print "Provided MIME Type : {0}".format(mime_type)
+            Logging.log("Provided MIME Type : {0}".format(mime_type))
 
         tmp_mime_type = self.server.configuration.mime_types.get(mime_type, None)
         if not tmp_mime_type:
-            print "Could not configure mime type!"
+            Logging.log("Could not configure mime type!")
             if mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-                print "All is well - Open Office determined - setting appropriately."
+                Logging.log("All is well - Open Office determined - setting appropriately.")
                 mime_type = "text/xml/xlsx"
             else:
                 raise AttributeError("Uh oh... Problem matching {0} in available {1}".format(mime_type,
@@ -908,16 +979,20 @@ class Project():
         if mime_type=="text/json" and not kwargs.has_key("record_path") and not kwargs.has_key(
             "recordPath"):
             if TIMING: start = time()
-            if DEBUG: print "JSON. Tracking record path..."
+            if DEBUG:
+                Logging.log("JSON. Tracking record path...")
             kwargs["recordPath"] = Project.identify_json_record_path(url)
-            if TIMING: print "REFINE : identifying JSON path took {0} seconds".format(time() - start)
+            if TIMING:
+                Logging.log("REFINE : identifying JSON path took {0} seconds".format(time() - start))
         elif mime_type=="text/line-based/*sv" and not kwargs.has_key("separator"):
             if TIMING: start = time()
-            if DEBUG: print "Text. Locating separator..."
-            kwargs["separator"]=Project.sv_separator(url)
-            if TIMING: print "REFINE : identifying *SV separator took {0} seconds".format(time() - start)
             if DEBUG:
-                print "Selected *sv separator {0}".format(str(kwargs["separator"]))
+                Logging.log("Text. Locating separator...")
+            kwargs["separator"]=Project.sv_separator(url)
+            if TIMING:
+                Logging.log("REFINE : identifying *SV separator took {0} seconds".format(time() - start))
+            if DEBUG:
+                Logging.log("Selected *sv separator {0}".format(str(kwargs["separator"])))
 
         boundary = choose_boundary()
         if TIMING: start = time()
@@ -937,42 +1012,52 @@ class Project():
                     json_response = response.json()
                     if json_response:
                         try:
-                            print "Failed to load data source {0}.\n{1}".format(path, response.text[0:300]) # error message
+                            Logging.log("Failed to load data source.\n{0}".format(response.text[0:300])) # error message
                         except Exception as e:
-                            print "Failed to display error message in _create_project_from_file! {0}".format(e.message)
+                            Logging.log("Failed to display error message in _create_project_from_file! {0}".format(e.message))
                 except Exception as e:
-                    print "Failed to load JSON in response to load-raw-data request - but there should be no JSON if this request" \
-                          " is successful so we are probably okay. {0}".format(e.message)
+                    Logging.log("Failed to load JSON in response to load-raw-data request - but there should be no JSON if this request" \
+                                " is successful so we are probably okay. {0}".format(e.message))
 
-        if TIMING: print "REFINE : load raw data took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : load raw data took {0} seconds".format(time() - start))
 
         if TIMING: start = time()
-        job_status = self._get_import_job_status(job_id) # polls for import completion
-        if TIMING: print "REFINE : polling for status took {0} seconds".format(time() - start)
+        try: job_status = self._get_import_job_status(job_id) # polls for import completion
+        except RefineHungOnFileLoadException: raise
+        if TIMING:
+            Logging.log("REFINE : polling for status took {0} seconds".format(time() - start))
 
         if mime_type == "text/line-based" and job_status.ranked_formats[0] != mime_type:
             mime_type = job_status.ranked_formats[0]
 
         if DEBUG:
-            print "Running with MIME Type : {0}".format(mime_type)
+            Logging.log("Running with MIME Type : {0}".format(mime_type))
         if mime_type:
             if TIMING: start = time()
             (mime_type, presets) = self._initialize_parser(job_id, mime_type)
-            if TIMING: print "REFINE : initializing parser took {0} seconds".format(time() - start)
+            if TIMING:
+                Logging.log("REFINE : initializing parser took {0} seconds".format(time() - start))
         presets.update(kwargs)
         if DEBUG:
-            print "Presets {0}".format(str(presets))
+            Logging.log("Presets {0}".format(str(presets)))
         if TIMING: start = time()
         update_response = self._update_format(job_id, mime_type, **presets)
-        if TIMING: print "REFINE : updating format took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : updating format took {0} seconds".format(time() - start))
 
         if TIMING: start = time()
         self._fetch_models(job_id)
-        if TIMING: print "REFINE : fetching models took {0} seconds".format(time() - start)
+        if TIMING:
+            Logging.log("REFINE : fetching models took {0} seconds".format(time() - start))
 
         if TIMING: start = time()
-        self._create(job_id, mime_type, name, **presets)
-        if TIMING: print "REFINE : creating project took {0} seconds".format(time() - start)
+        try:
+            self._create(job_id, mime_type, name, **presets)
+        except RefineHungOnFileLoadException as e:
+            raise
+        if TIMING:
+            Logging.log("REFINE : creating project took {0} seconds".format(time() - start))
 
     @staticmethod
     def sv_separator(url=None, path=None):
@@ -981,7 +1066,7 @@ class Project():
             try:
                 remove(local_path)
             except Exception as e:
-                print "Could not delete local copy of file {0} : {1}".format(local_path, e)
+                Logging.log("Could not delete local copy of file {0} : {1}".format(local_path, e))
 
         content_line = ""
         if url:
@@ -998,22 +1083,26 @@ class Project():
         if match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|,)+$", content_line):
             try:
                 cleanup(local_path)
-            except Exception as e: print "Could not destroy tmp file! {0}".format(e)
+            except Exception as e:
+                Logging.log("Could not destroy tmp file! {0}".format(e))
             return ","
         elif match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|\t)+$", content_line):
             try:
                 cleanup(local_path)
-            except Exception as e: print "Could not destroy tmp file! {0}".format(e)
+            except Exception as e:
+                Logging.log("Could not destroy tmp file! {0}".format(e))
             return u"\\t"
         elif match("^(?:(?:\"[^\"]+\")|(?:[^,]+)|;)+$", content_line):
             try:
                 cleanup(local_path)
-            except Exception as e: print "Could not destroy tmp file! {0}".format(e)
+            except Exception as e:
+                Logging.log("Could not destroy tmp file! {0}".format(e))
             return ";"
         else:
             try:
                 cleanup(local_path)
-            except Exception as e: print "Could not destroy tmp file! {0}".format(e)
+            except Exception as e:
+                Logging.log("Could not destroy tmp file! {0}".format(e))
             return "," # and hope for the best
 
 
@@ -1034,22 +1123,22 @@ class Project():
         # Note that google refine expects a nameless node to be specified as "__anonymous__", e.g. the root node
         def recurse(node, route):
             if DEBUG:
-                print "Route state {0}".format(route)
+                Logging.log("Route state {0}".format(route))
             if isinstance(node, dict):
                 if DEBUG:
-                    print "Node is a dictionary."
+                    Logging.log("Node is a dictionary.")
                 if len(route) == 0:
                     route.append("__anonymous__")
                 for k in node.keys():
                     if DEBUG:
-                        print "Recursing on key {0}.".format(k)
+                        Logging.log("Recursing on key {0}.".format(k))
                     r = list(route)
                     r.append(k)
                     new_route = recurse(node[k], r)
                     if new_route: return new_route
             elif isinstance(node, list):
                 if DEBUG:
-                    print "Node is a list."
+                    Logging.log("Node is a list.")
                 if len(route) == 0:
                     return route # because the root node is a list - treat it as the recordset
                 else:
@@ -1058,11 +1147,11 @@ class Project():
                         if node[0].keys() == node[1].keys() or (set(node[0].keys()) <= set(node[1].keys())) or (
                                 set(node[1].keys()) <= set(node[0].keys())):
                             if DEBUG:
-                                print "List passed key test! Found recordset!"
+                                Logging.log("List passed key test! Found recordset!")
                             return route
                         else:
                             if DEBUG:
-                                print "Key sets do not match!"
+                                Logging.log("Key sets do not match!")
                     elif len(node) == 1:
                         return route
 
@@ -1070,7 +1159,7 @@ class Project():
         path = recurse(content, path)
         path.append("__anonymous__")
         if DEBUG:
-            print "RECORD PATH : {0}".format(path)
+            Logging.log("RECORD PATH : {0}".format(path))
             # refine wants the first record node, not the list node comprising it
         return path
 
@@ -1080,7 +1169,8 @@ class Project():
                                          "&separator={2}&mode=plain&project={3}".format(RefineServer.simple_quote(column_name),
                                                                                         RefineServer.simple_quote(key_column),
                                                                                         separator, self.id)))
-        except http_exceptions.RequestException: print "Unable to split cell."
+        except http_exceptions.RequestException:
+            Logging.log("Unable to split cell.")
 
     def split_column_by_separator(self, column_name, separator=",", regex=False, remove_original=True,
                                   guess_cell_type=True):
@@ -1093,7 +1183,8 @@ class Project():
                                                              RefineServer.simple_quote(separator),
                                                              RefineServer.simple_quote(regex) if regex else "false")))
             self._fetch_models()
-        except http_exceptions.RequestException: print "Unable to split column."
+        except http_exceptions.RequestException:
+            Logging.log("Unable to split column.")
 
     def split_column_by_field_length(self, column_name, lengths, remove_original=True, guess_cell_type=True):
         try:
@@ -1104,7 +1195,8 @@ class Project():
                                                                     str(remove_original).lower(),
                                                                     RefineServer.simple_quote(lengths))))
             self._fetch_models()
-        except http_exceptions.RequestException: print "Unable to split column."
+        except http_exceptions.RequestException:
+            Logging.log("Unable to split column.")
         return response
 
     def edit_cell(self, row_index, column_index, new_value, type="text", facets=[], mode="row-based"):
@@ -1114,14 +1206,14 @@ class Project():
         if TIMING: start = time()
         try:
             data = {"engine":{"facets": [f.refine_formatted_keys() for f in facets],
-                               "mode": mode},
+                              "mode": mode},
                     "row":row_index,
                     "cell":column_index,
                     "type":"{0}".format(type),
                     "value":"{0}".format(new_value)}
             response = self.server.post("command/core/edit-one-cell?project={0}".format(self.id), **{"data":data})
         except Exception as e:
-            print "Request command/core/edit-one-cell?project={0} failed. {1}".format(self.id, e.message)
+            Logging.log("Request command/core/edit-one-cell?project={0} failed. {1}".format(self.id, e.message))
 
     def mass_edit(self, column_name, expression="value", edits=[], facets=[], mode="row-based"):
         """
@@ -1138,7 +1230,7 @@ class Project():
                     "edits":json.dumps(edits)}
             response = self.server.post("command/core/mass-edit?project={0}".format(self.id), **{"data":data})
         except Exception as e:
-            print "Request command/core/mass-edit?project={0} failed. {1}".format(self.id, e.message)
+            Logging.log("Request command/core/mass-edit?project={0} failed. {1}".format(self.id, e.message))
 
 
     def add_column(self, base_column, new_column, insert_index=0, expression="value", on_error="store-error", facets=[], mode="row-based"):
@@ -1149,11 +1241,12 @@ class Project():
                 RefineServer.simple_quote(base_column), RefineServer.simple_quote(expression),
                 RefineServer.simple_quote(new_column), insert_index, RefineServer.simple_quote(on_error), self.id),
                                         **{"data": data})
-            if TIMING: print "REFINE : adding column {0} took {1} seconds".format(new_column, time() - start)
+            if TIMING:
+                Logging.log("REFINE : adding column {0} took {1} seconds".format(new_column, time() - start))
         except Exception as e:
-            print "Request command/core/add-column?baseColumnName={0}&expression={1}&newColumnName={2}&columnInsertIndex={3}&onError={4}&project={5}".format(
+            Logging.log("Request command/core/add-column?baseColumnName={0}&expression={1}&newColumnName={2}&columnInsertIndex={3}&onError={4}&project={5}".format(
                 RefineServer.simple_quote(base_column), RefineServer.simple_quote(expression),
-                RefineServer.simple_quote(new_column), insert_index, RefineServer.simple_quote(on_error), self.id, e.message)
+                RefineServer.simple_quote(new_column), insert_index, RefineServer.simple_quote(on_error), self.id, e.message))
 
 
     def remove_column(self, column_name, facets=[], mode="row-based"):
@@ -1164,21 +1257,25 @@ class Project():
                                                                                                        .simple_quote(column_name),
                                                                                                        self.id),
                                         **{"data": data})
-            if TIMING: print "REFINE : removing column {0} took {1} seconds".format(column_name, time() - start)
+            if TIMING:
+                Logging.log("REFINE : removing column {0} took {1} seconds".format(column_name, time() - start))
         except Exception as e:
-            print "Request command/core/remove-column?columnName={0}&project={1} failed. {2}".format(column_name,
-                                                                                                     self.id, e.message)
+            Logging.log("Request command/core/remove-column?columnName={0}&project={1} failed. {2}".format(column_name, self.id, e.message))
             # response {"code":"ok","historyEntry":{"id":1364233915139,"description":"Remove column grouper","time":"2013-03-25T13:37:03Z"}}
 
     def remove_rows(self, facets=[], mode="row-based"):
         if TIMING: start = time()
+        if len(facets) == 0:
+            facets = self._facets
         try:
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in facets], "mode": mode}}
             response = self.server.post("command/core/remove-rows?project={0}".format(self.id),
                                         **{"data": data})
-            if TIMING: print "REFINE : removing rows took {0} seconds".format(time() - start)
-        except http_exceptions.RequestException: print "Request command/core/remove-rows?project={0} failed.".format(
-            self.id)
+            if TIMING:
+                Logging.log("REFINE : removing rows took {0} seconds".format(time() - start))
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/remove-rows?project={0} failed.".format(
+                self.id))
 
     def compute_facets(self, mode="row-based"):
         if TIMING: start = time()
@@ -1186,29 +1283,37 @@ class Project():
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode}}
             response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
                                         **{"data": data})
-            if TIMING: print "REFINE : computing facets took {0} seconds".format(time() - start)
+            if TIMING:
+                Logging.log("REFINE : computing facets took {0} seconds".format(time() - start))
             try:
                 json_response = response.json()
             except Exception as e:
                 raise Exception("Failed to retrieve JSON of response to compute-facets request. {0}".format(e.message))
             return [FacetComputation(**f) for f in json_response.get("facets")]
-        except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed.".format(
-            self.id)
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/compute-facets?project={0} failed.".format(
+                self.id))
 
-    def test_facets(self, test_facets, mode="row-based"):
+    def test_facets(self, test_facets, mode="row-based", include_existing_facets=False):
         if TIMING: start = time()
+        facets = [f.refine_formatted_keys() for f in test_facets]
+        if include_existing_facets:
+            facets = [f.refine_formatted_keys() for f in self._facets]
+            facets[len(facets):] = [f.refine_formatted_keys() for f in test_facets]
         try:
-            data = {"engine": {"facets": [f.refine_formatted_keys() for f in test_facets], "mode": mode}}
+            data = {"engine": {"facets": facets, "mode": mode}}
             response = self.server.post("command/core/compute-facets?project={0}".format(self.id),
                                         **{"data": data})
             try:
                 json_response = response.json()
             except Exception as e:
                 raise Exception("Failed to retrieve JSON of response to compute-facets request. {0}".format(e.message))
-            if TIMING: print "REFINE : testing facets took {0} seconds".format(time() - start)
+            if TIMING:
+                Logging.log("REFINE : testing facets took {0} seconds".format(time() - start))
             return [FacetComputation(**f) for f in json_response.get("facets")]
-        except http_exceptions.RequestException: print "Request command/core/compute-facets?project={0} failed for test case.".format(
-            self.id)
+        except http_exceptions.RequestException:
+            Logging.log("Request command/core/compute-facets?project={0} failed for test case.".format(
+                self.id))
 
 
     def flag_row(self, row_number, state="true", mode="row-based"):
@@ -1216,28 +1321,32 @@ class Project():
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode}}
             response = self.server.post("command/core/annotate-one-row?flagged={2}&row={0}&project={1}".format(
                 row_number, self.id, state), **{"data": data})
-        except http_exceptions.RequestException: print "Unable to flag row {0}.".format(row_number)
+        except http_exceptions.RequestException:
+            Logging.log("Unable to flag row {0}.".format(row_number))
 
     def flag_rows(self, state="true", mode="row-based"):
         try:
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode}}
             response = self.server.post("command/core/annotate-rows?flagged={1}&project={0}".format(self.id, state),
                                         **{"data": data})
-        except http_exceptions.RequestException: print "Unable to flag rows."
+        except http_exceptions.RequestException:
+            Logging.log("Unable to flag rows.")
 
     def star_row(self, row_number, state="true", mode="row-based"):
         try:
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode}}
             response = self.server.post("command/core/annotate-one-row?starred={2}&row={0}&project={1}".format(
                 row_number, self.id, state), **{"data": data})
-        except http_exceptions.RequestException: print "Unable to star row {0}.".format(row_number)
+        except http_exceptions.RequestException:
+            Logging.log("Unable to star row {0}.".format(row_number))
 
     def star_rows(self, state="true", mode="row-based"):
         try:
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode}}
             response = self.server.post("command/core/annotate-rows?starred={1}&project={0}".format(self.id, state),
                                         **{"data": data})
-        except http_exceptions.RequestException: print "Unable to star rows."
+        except http_exceptions.RequestException:
+            Logging.log("Unable to star rows.")
 
     def undo_redo(self, project_version=0, mode="row-based"):
         if TIMING: start = time()
@@ -1245,8 +1354,10 @@ class Project():
             data = {"engine": {"facets": [f.refine_formatted_keys() for f in self.facets], "mode": mode}}
             response = self.server.post("command/core/undo-redo?lastDoneID={0}&project={1}".format(
                 project_version, self.id), **{"data": data})
-        except http_exceptions.RequestException: print "Unable to undo/redo to version {0}.".format(project_version)
-        if TIMING: print "REFINE : undo/redo took {0} seconds".format(time() - start)
+        except http_exceptions.RequestException:
+            Logging.log("Unable to undo/redo to version {0}.".format(project_version))
+        if TIMING:
+            Logging.log("REFINE : undo/redo took {0} seconds".format(time() - start))
 
 
 
@@ -1334,7 +1445,7 @@ class Facet(object):
         if not match("^(?:grel)|(?:jython)|(?:clojure):", clean_expression):
             clean_expression = "grel:" + clean_expression
         if DEBUG:
-            print clean_expression
+            Logging.log(clean_expression)
         return clean_expression
 
 
